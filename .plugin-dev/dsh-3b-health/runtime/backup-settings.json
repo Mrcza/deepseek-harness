@@ -1,0 +1,14 @@
+{
+  "destination": "/Volumes/My Passport/生活助手备份",
+  "groups": [
+    "databases",
+    "exports",
+    "originals"
+  ],
+  "hours": 168,
+  "keep": 3,
+  "device": 16777237,
+  "enabled": true,
+  "next_due": 1794656942.906212,
+  "confirmed_at": "2026-10-24T10:58:47.013919+00:00"
+}

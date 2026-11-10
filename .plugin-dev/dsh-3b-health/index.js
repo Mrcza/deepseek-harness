@@ -157,6 +157,75 @@ function storeError(reason) {
   return error
 }
 
+function localRuntimeDir(home) {
+  return process.env.DATACENTER_LOCAL_RUNTIME || join(home, 'Desktop', 'deepseek-harness', '.plugin-dev', 'dsh-3b-health', 'runtime')
+}
+
+/**
+ * @param {string} sourcePath store file
+ * @param {string} copyPath runtime copy
+ * @returns {boolean} true when the store file is newer or a different size
+ */
+function isStaleRuntimeCopy(sourcePath, copyPath) {
+  try {
+    const sourceInfo = statSync(sourcePath)
+    const copyInfo = statSync(copyPath)
+    return sourceInfo.mtimeMs > copyInfo.mtimeMs || sourceInfo.size !== copyInfo.size
+  } catch (_e) {
+    return false
+  }
+}
+
+/**
+ * @param {string} sourcePath store file
+ * @param {string} targetPath runtime copy
+ * @param {string} runtimeDir runtime directory
+ */
+function writeRuntimeCopy(sourcePath, targetPath, runtimeDir) {
+  mkdirSync(runtimeDir, { recursive: true, mode: 0o700 })
+  const tmp = targetPath + '.tmp'
+  writeFileSync(tmp, readFileSync(sourcePath))
+  try {
+    chmodSync(tmp, 0o600)
+  } catch (_e) {
+    // permission tightening is best effort on restricted volumes
+  }
+  renameSync(tmp, targetPath)
+}
+
+/**
+ * Resolve a store JSON file to its local runtime copy.
+ * Read-only files refresh when the store file is newer; plugin-owned write
+ * targets keep the runtime copy as their source of truth.
+ * @param {string | null} dir store data directory
+ * @param {string} source store source
+ * @param {string} home user home
+ * @param {string} filename file name
+ * @param {boolean} [refreshFromSource] refresh the runtime copy from the store file
+ * @returns {string | null} path to read or write
+ */
+function resolveRuntimeFile(dir, source, home, filename, refreshFromSource = false) {
+  if (!dir) return null
+  if (source === 'datacenter') {
+    const rtDir = localRuntimeDir(home)
+    const rtPath = join(rtDir, filename)
+    const dcPath = join(dir, filename)
+    const missing = !existsSync(rtPath)
+    const stale = refreshFromSource && existsSync(dcPath) && isStaleRuntimeCopy(dcPath, rtPath)
+    if (existsSync(dcPath) && (missing || stale)) {
+      try {
+        writeRuntimeCopy(dcPath, rtPath, rtDir)
+        return rtPath
+      } catch (_e) {
+        return dcPath
+      }
+    }
+    // Write targets always resolve to the runtime path so plugin-owned state stays local.
+    return existsSync(rtPath) || !refreshFromSource ? rtPath : dcPath
+  }
+  return join(dir, filename)
+}
+
 /**
  * Derive every plugin path from one resolved store.
  * @param {{ dir: string | null, source: string, usable: boolean, reason: string | null }} [store]
@@ -168,12 +237,13 @@ function resolvePaths(store = resolveStore()) {
   return {
     store,
     privateDir: dir,
+    runtimeDir: store.source === 'datacenter' ? localRuntimeDir(home) : dir,
     lifeDb: dir ? join(dir, 'life.sqlite3') : null,
     exportsDb: dir ? join(dir, 'health-exports.sqlite3') : null,
-    summaryJson: dir ? join(dir, 'health-summary.json') : null,
-    syncJson: dir ? join(dir, 'health-export-sync.json') : null,
-    prefsJson: dir ? join(dir, 'dsh-health-preferences.json') : null,
-    tracesJsonl: dir ? join(dir, 'dsh-plugin-traces.jsonl') : null,
+    summaryJson: resolveRuntimeFile(dir, store.source, home, 'health-summary.json', true),
+    syncJson: resolveRuntimeFile(dir, store.source, home, 'health-export-sync.json', true),
+    prefsJson: resolveRuntimeFile(dir, store.source, home, 'dsh-health-preferences.json'),
+    tracesJsonl: resolveRuntimeFile(dir, store.source, home, 'dsh-plugin-traces.jsonl'),
     analysisRoot: join(home, 'Library', 'Application Support', 'ThreeBody', 'AgentAnalysis'),
   }
 }
@@ -205,8 +275,8 @@ let lastMigrationReport = null
  */
 function ensureMigrated(store, paths) {
   if (!store.usable || store.source === 'legacy') return null
-  const markerPath = join(store.dir, MIGRATION_MARKER)
-  if (existsSync(markerPath)) return null
+  const markerPath = resolveRuntimeFile(store.dir, store.source, userHome(), MIGRATION_MARKER)
+  if (markerPath && existsSync(markerPath)) return null
   const lastAttempt = migrationAttempts.get(store.dir)
   if (lastAttempt && Date.now() - lastAttempt < 5 * 60 * 1000) return null
 
@@ -717,10 +787,66 @@ function deleteCheckin(payload) {
   return { ok: true, checkins: listCheckins(30, store) }
 }
 
+const _sqliteStatsCache = {
+  exportsKey: null,
+  exportsVal: null,
+}
+const _exportMtimeCache = {
+  dir: null,
+  at: 0,
+  val: null,
+}
+
+function dbFileSignature(dbPath) {
+  try {
+    const st = statSync(dbPath)
+    let walPart = '0:0'
+    const walPath = dbPath + '-wal'
+    if (existsSync(walPath)) {
+      const wst = statSync(walPath)
+      walPart = `${wst.size}:${wst.mtimeMs}`
+    }
+    return `${st.dev}:${st.ino}:${st.size}:${st.mtimeMs}:${walPart}`
+  } catch (_e) {
+    return null
+  }
+}
+
 /**
- * Read DataCenter's sync state file without touching the large health tables.
+ * @param {string | null} sourceDir iCloud export directory
+ * @returns {number | null} newest JSON/ZIP modification time, or null when unavailable
+ */
+function newestExportMtime(sourceDir) {
+  if (!sourceDir || !existsSync(sourceDir)) return null
+  const now = Date.now()
+  if (_exportMtimeCache.dir === sourceDir && now - _exportMtimeCache.at < 30000) {
+    return _exportMtimeCache.val
+  }
+  let newest = 0
+  try {
+    for (const name of readdirSync(sourceDir)) {
+      if (!name.endsWith('.json') && !name.endsWith('.zip')) continue
+      try {
+        const info = statSync(join(sourceDir, name))
+        if (info.mtimeMs > newest) newest = info.mtimeMs
+      } catch (_e) {
+        // one unreadable export must not hide the rest
+      }
+    }
+  } catch (_e) {
+    return null
+  }
+  const result = newest || null
+  _exportMtimeCache.dir = sourceDir
+  _exportMtimeCache.at = now
+  _exportMtimeCache.val = result
+  return result
+}
+
+/**
+ * Read DataCenter's sync state file only.
  * @param {object} [store] resolved store
- * @returns {object | null} folder sync state (without the per-file hash map)
+ * @returns {object | null} folder sync state without the per-file hash map
  */
 function readFolderSync(store = resolveStore()) {
   const paths = resolvePaths(store)
@@ -728,7 +854,7 @@ function readFolderSync(store = resolveStore()) {
   if (paths.syncJson && existsSync(paths.syncJson)) {
     try {
       const raw = JSON.parse(readFileSync(paths.syncJson, 'utf8'))
-      const { seen: _seen, ...rest } = raw
+      const { seen: _seen, file_signatures: _sigs, ...rest } = raw
       folderSync = rest
     } catch (_e) {}
   }
@@ -741,49 +867,85 @@ function readFolderSync(store = resolveStore()) {
   return folderSync
 }
 
-const syncStatsCache = new Map()
-const SYNC_STATS_TTL_MS = 60 * 1000
-
 /**
- * Read import statistics from small tables only.
- * health_events is 2.69 GB with no index on `end`; its row total equals the sum of
- * `imports.added` over completed Apple Health imports, so requests never scan it.
- * @param {object} [store] resolved store
- * @param {string | null} [revision] cache revision, normally folder sync last_success
- * @returns {{ file_import: object, zip_import: object }}
+ * Read DataCenter-owned sync state without writing it.
+ * Small tables only: the 2.69 GB health_events table is never scanned.
+ * @param {{ dir: string | null, source: string, usable: boolean, reason: string | null }} [store]
+ * @returns {object} folder/file/zip import statistics for the sync panel
  */
-function readSyncStats(store = resolveStore(), revision = null) {
+function readSyncStatus(store = resolveStore()) {
   const paths = resolvePaths(store)
-  const cached = syncStatsCache.get(store.dir)
-  if (cached && cached.revision === revision && Date.now() - cached.at < SYNC_STATS_TTL_MS) {
-    return cached.value
+  const folderSync = readFolderSync(store)
+
+  const revision = folderSync?.last_success || null
+  const exportCachePath = paths.runtimeDir ? join(paths.runtimeDir, 'dsh-health-export-stats.json') : null
+  let cachedExportStats = null
+  if (revision && exportCachePath && existsSync(exportCachePath)) {
+    try {
+      cachedExportStats = JSON.parse(readFileSync(exportCachePath, 'utf8'))
+    } catch (_e) {
+      cachedExportStats = null
+    }
   }
 
   let fileImport = { files: 0, records: 0, workouts: 0, last_workout_at: null, last_imported: null }
-  if (paths.exportsDb && existsSync(paths.exportsDb)) {
-    try {
-      const db = new DatabaseSync(paths.exportsDb, { readOnly: true })
+  if (cachedExportStats && cachedExportStats.revision === revision) {
+    fileImport = {
+      files: Number(cachedExportStats.files || 0),
+      records: Number(cachedExportStats.records || 0),
+      workouts: Number(cachedExportStats.workouts || 0),
+      last_workout_at: cachedExportStats.last_workout_at || null,
+      last_imported: cachedExportStats.last_imported || null,
+    }
+  } else if (paths.exportsDb && existsSync(paths.exportsDb)) {
+    const expSig = dbFileSignature(paths.exportsDb)
+    if (expSig && _sqliteStatsCache.exportsKey === expSig && _sqliteStatsCache.exportsVal) {
+      fileImport = _sqliteStatsCache.exportsVal
+    } else {
       try {
-        const tables = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r => r.name))
-        if (tables.has('files') && tables.has('records')) {
-          const filesCount = db.prepare('SELECT count(*) AS c, max(imported_at) AS last FROM files').get()
-          const recordsCount = db.prepare('SELECT count(*) AS c FROM records').get()
-          let workoutsCount = { c: 0, last: null }
-          if (tables.has('workouts')) {
-            workoutsCount = db.prepare('SELECT count(*) AS c, max(start_date) AS last FROM workouts').get()
+        const db = new DatabaseSync(paths.exportsDb, { readOnly: true })
+        try {
+          const tables = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r => r.name))
+          if (tables.has('files') && tables.has('records')) {
+            const filesCount = db.prepare('SELECT count(*) AS c, max(imported_at) AS last FROM files').get()
+            const recordsCount = db.prepare('SELECT count(*) AS c FROM records').get()
+            let workoutsCount = { c: 0, last: null }
+            if (tables.has('workouts')) {
+              workoutsCount = db.prepare('SELECT count(*) AS c, max(start_date) AS last FROM workouts').get()
+            }
+            fileImport = {
+              files: Number(filesCount?.c || 0),
+              records: Number(recordsCount?.c || 0),
+              workouts: Number(workoutsCount?.c || 0),
+              last_workout_at: workoutsCount?.last || null,
+              last_imported: filesCount?.last || null,
+            }
+            if (expSig) {
+              _sqliteStatsCache.exportsKey = expSig
+              _sqliteStatsCache.exportsVal = fileImport
+            }
           }
-          fileImport = {
-            files: Number(filesCount?.c || 0),
-            records: Number(recordsCount?.c || 0),
-            workouts: Number(workoutsCount?.c || 0),
-            last_workout_at: workoutsCount?.last || null,
-            last_imported: filesCount?.last || null,
-          }
+        } finally {
+          db.close()
         }
-      } finally {
-        db.close()
+      } catch (_e) {}
+    }
+    if (revision && exportCachePath && fileImport.files > 0) {
+      try {
+        const runtimeDir = paths.runtimeDir
+        mkdirSync(runtimeDir, { recursive: true, mode: 0o700 })
+        const tmp = exportCachePath + '.tmp'
+        writeFileSync(tmp, JSON.stringify({ revision, ...fileImport, updated_at: new Date().toISOString() }, null, 2))
+        try {
+          chmodSync(tmp, 0o600)
+        } catch (_e) {
+          // permission tightening is best effort on restricted volumes
+        }
+        renameSync(tmp, exportCachePath)
+      } catch (_e) {
+        // cache write failure only costs a later recompute
       }
-    } catch (_e) {}
+    }
   }
 
   let zipImport = {
@@ -819,24 +981,11 @@ function readSyncStats(store = resolveStore(), revision = null) {
     }
   }
 
-  const value = { file_import: fileImport, zip_import: zipImport }
-  syncStatsCache.set(store.dir, { revision, at: Date.now(), value })
-  return value
-}
-
-/**
- * Full phone-sync view: cheap folder state plus small-table import statistics.
- * @param {object} [store] resolved store
- * @returns {object} store, folder_sync, file_import and zip_import
- */
-function readSyncStatus(store = resolveStore()) {
-  const folderSync = readFolderSync(store)
-  const stats = readSyncStats(store, folderSync?.last_success || null)
   return {
     store: { dir: store.dir, source: store.source, usable: store.usable, reason: store.reason },
     folder_sync: folderSync,
-    file_import: stats.file_import,
-    zip_import: stats.zip_import,
+    file_import: fileImport,
+    zip_import: zipImport,
   }
 }
 
@@ -856,6 +1005,7 @@ function buildDiagnostics(store, paths, healthData, folderSync) {
     }
   } catch (_e) {}
   const latest = healthData?.latest_source_date || null
+  const newestExportAt = newestExportMtime(folderSync?.source || null)
   const summaryMs = summaryMtime ? Date.parse(summaryMtime) : null
   const lastSuccessMs = folderSync?.last_success ? Date.parse(folderSync.last_success) : null
   const pending = folderSync?.pending ?? null
@@ -872,10 +1022,12 @@ function buildDiagnostics(store, paths, healthData, folderSync) {
     summary_mtime: summaryMtime,
     latest_source_date: latest,
     data_lag_days: lagDays,
+    newest_export_at: newestExportAt ? new Date(newestExportAt).toISOString() : null,
     summary_outdated: !!(
       (pending !== null && pending > 0)
       || snapshotPending === true
       || folderSync?.snapshot_error
+      || (newestExportAt && summaryMs && newestExportAt > summaryMs + 60000)
       || (Number.isFinite(lastSuccessMs) && summaryMs && summaryMs + 60000 < lastSuccessMs)
     ),
     sync_checked_at: folderSync?.checked_at || null,
@@ -914,7 +1066,6 @@ function triggerSyncCheck() {
   const store = resolveStore()
   const paths = resolvePaths(store)
   ensureMigrated(store, paths)
-  syncStatsCache.delete(store.dir)
   const sync = readSyncStatus(store)
   const folder = sync.folder_sync || {}
   const entry = recordTrace(

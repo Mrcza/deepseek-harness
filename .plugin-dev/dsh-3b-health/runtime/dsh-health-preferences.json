@@ -1,0 +1,22 @@
+{
+  "metrics": [
+    "vo2max",
+    "walking_hr",
+    "sleep",
+    "hrv",
+    "body_mass",
+    "body_fat"
+  ],
+  "periods": [
+    365,
+    30,
+    30,
+    30,
+    30,
+    30
+  ],
+  "stage_days": 30,
+  "updated_at": "2026-11-10T13:14:47+08:00",
+  "plugin_id": "@local/dsh-3b-health",
+  "source_label": "通过 dsh 3B健康插件写入"
+}

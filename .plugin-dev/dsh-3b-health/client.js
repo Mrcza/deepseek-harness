@@ -5,7 +5,7 @@
  *   - Right main view (`main`, key: '3b-health')
  * Features:
  *   1. 健康仪表盘: 4 core cards (with interactive 饮食记录 & 精力自评 check-ins),
- *      6 customizable trend charts (44 metrics × 30/90/365d persisted on backend),
+ *      6 customizable trend charts (43 metrics × 30/90/365d persisted on backend),
  *      stage summary, and 7-day workouts.
  *   2. 手机同步: iCloud folder sync status, manual check trigger, Health JSON & ZIP DB stats.
  *   3. AI 健康分析: Native DSH analysis package builder + one-click jump into DSH session.
@@ -53,297 +53,540 @@ window.__ModuleLoader__.load({
     ]
 
     function injectStyles() {
-      if (typeof document === 'undefined' || document.getElementById(STYLE_ID)) return
-      const style = document.createElement('style')
-      style.id = STYLE_ID
-      style.textContent = `
+      if (typeof document === 'undefined') return
+      const css = `
+        /* 3B健康 · 归藏瑞士风落在 DSH 设计令牌上：单一锚点色、细线网格、等宽数字。 */
         .dsh-3b-health-root {
+          --3b-page-max: 960px;
+          --3b-ink: var(--dsw-alias-label-primary);
+          --3b-ink-2: var(--dsw-alias-label-secondary);
+          --3b-ink-3: var(--dsw-alias-label-tertiary);
+          --3b-ink-4: var(--dsw-alias-label-caption);
+          --3b-surface: var(--dsw-alias-settings-card-fill);
+          --3b-stroke: var(--dsw-alias-settings-card-stroke);
+          --3b-accent: var(--dsw-alias-state-business-primary);
+          --3b-rule: var(--dsw-alias-border-l2);
+          box-sizing: border-box;
           height: 100%;
           width: 100%;
+          overflow-x: hidden;
           overflow-y: auto;
-          background: var(--dsw-alias-bg-primary, #0f1115);
-          color: var(--dsw-alias-text-primary, #e6e8ee);
-          font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
-          padding: 24px 28px 48px;
-          box-sizing: border-box;
+          padding: calc(28px + var(--dsh-frame-top-clearance, 0px)) clamp(20px, 4vw, 48px) 48px;
+          background: var(--dsw-alias-bg-base);
+          color: var(--3b-ink);
+          font-family: var(--dsw-font-family);
+          font-size: 13px;
+          line-height: 20px;
+          scrollbar-color: var(--dsw-alias-scrollbar-bg-l1) transparent;
         }
         .dsh-3b-health-container {
-          max-width: 1280px;
+          max-width: var(--3b-page-max);
           margin: 0 auto;
           display: flex;
           flex-direction: column;
-          gap: 20px;
+          gap: 32px;
         }
+        .dsh-3b-section {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        /* 页头：标题与操作同排，元信息第二行，页签整宽第三行 */
         .dsh-3b-topbar {
           display: flex;
           flex-wrap: wrap;
-          align-items: center;
+          align-items: flex-start;
           justify-content: space-between;
-          gap: 14px;
-          padding-bottom: 16px;
-          border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,0.18));
+          gap: 16px 24px;
         }
         .dsh-3b-brand {
+          order: 1;
+          flex: 1 1 320px;
+          min-width: 0;
           display: flex;
           flex-direction: column;
-          gap: 4px;
+          gap: 6px;
         }
         .dsh-3b-brand-row {
           display: flex;
+          flex-wrap: wrap;
           align-items: center;
-          gap: 10px;
+          gap: 8px;
         }
         .dsh-3b-title {
-          font-size: 20px;
-          font-weight: 650;
           margin: 0;
-          letter-spacing: -0.01em;
-        }
-        .dsh-3b-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          font-size: 11px;
+          font-size: 20px;
+          line-height: 28px;
           font-weight: 500;
-          padding: 2px 8px;
-          border-radius: 999px;
-          background: rgba(16, 185, 129, 0.14);
-          color: #10b981;
-          border: 1px solid rgba(16, 185, 129, 0.28);
-        }
-        .dsh-3b-badge.blue {
-          background: rgba(59, 130, 246, 0.14);
-          color: #60a5fa;
-          border-color: rgba(59, 130, 246, 0.28);
-        }
-        .dsh-3b-badge.amber {
-          background: rgba(245, 158, 11, 0.14);
-          color: #fbbf24;
-          border-color: rgba(245, 158, 11, 0.28);
         }
         .dsh-3b-subtitle {
-          font-size: 12px;
-          color: var(--dsw-alias-text-secondary, #9ca3af);
           margin: 0;
+          font-size: 13px;
+          line-height: 20px;
+          color: var(--3b-ink-2);
+        }
+        .dsh-3b-path {
+          margin: 0;
+          font-family: var(--ds-font-family-code);
+          font-size: 11px;
+          line-height: 16px;
+          color: var(--3b-ink-4);
+          overflow-wrap: anywhere;
+        }
+        .dsh-3b-actions {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+        }
+        .dsh-3b-topbar > .dsh-3b-actions {
+          order: 2;
+        }
+        .dsh-3b-tab-row {
+          order: 3;
+          flex: 1 1 100%;
+          display: flex;
+          min-width: 0;
         }
         .dsh-3b-nav {
           display: flex;
           align-items: center;
-          gap: 6px;
-          background: var(--dsw-alias-bg-secondary, rgba(128,128,128,0.08));
+          width: fit-content;
+          max-width: 100%;
           padding: 4px;
-          border-radius: 10px;
-          border: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,0.16));
+          box-sizing: border-box;
+          border-radius: var(--dsw-radius-lg);
+          background: var(--dsw-alias-bg-module-platform);
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+        .dsh-3b-nav::-webkit-scrollbar {
+          display: none;
         }
         .dsh-3b-tab {
+          height: 34px;
+          padding: 0 12px;
           border: none;
+          border-radius: var(--dsw-radius-md);
           background: transparent;
-          color: var(--dsw-alias-text-secondary, #9ca3af);
-          font-size: 13px;
-          font-weight: 500;
-          padding: 6px 14px;
-          border-radius: 7px;
+          color: var(--3b-ink-2);
+          font-family: inherit;
+          font-size: 14px;
+          line-height: 20px;
+          font-weight: 400;
+          white-space: nowrap;
           cursor: pointer;
-          transition: all 0.15s ease;
-        }
-        .dsh-3b-tab:hover {
-          color: var(--dsw-alias-text-primary, #fff);
+          transition: color 180ms var(--ds-ease-in-out);
         }
         .dsh-3b-tab.active {
-          background: var(--dsw-alias-bg-primary, #181b22);
-          color: var(--dsw-alias-text-primary, #fff);
-          box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+          background: var(--dsw-alias-bg-layer-3);
+          color: var(--3b-ink);
+          font-weight: 500;
+          box-shadow: inset 0 0 0 0.5px var(--dsw-alias-border-l3);
         }
-        .dsh-3b-actions {
-          display: flex;
+        @media (hover: hover) {
+          .dsh-3b-tab:hover {
+            color: var(--3b-ink);
+          }
+        }
+
+        /* 徽章与提示条：一个 accent + 语义色只做状态 */
+        .dsh-3b-badge {
+          display: inline-flex;
           align-items: center;
+          gap: 4px;
+          height: 20px;
+          padding: 0 8px;
+          box-sizing: border-box;
+          border: 0.5px solid var(--dsw-alias-border-l3);
+          border-radius: 999px;
+          corner-shape: round;
+          background: var(--dsw-alias-bg-module-platform);
+          color: var(--3b-ink-2);
+          font-size: 11px;
+          line-height: 14px;
+          font-weight: 500;
+          white-space: nowrap;
+        }
+        .dsh-3b-badge.accent {
+          background: color-mix(in srgb, var(--3b-accent) 10%, transparent);
+          border-color: color-mix(in srgb, var(--3b-accent) 35%, transparent);
+          color: var(--3b-accent);
+        }
+        .dsh-3b-badge.success {
+          background: var(--dsw-alias-state-success-tertiary);
+          border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 35%, transparent);
+          color: var(--3b-ink);
+        }
+        .dsh-3b-badge.warn {
+          background: var(--dsw-alias-state-warn-tertiary);
+          border-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 45%, transparent);
+          color: var(--3b-ink);
+        }
+        .dsh-3b-notice,
+        .dsh-3b-success {
+          display: flex;
+          align-items: flex-start;
           gap: 8px;
+          padding: 10px 14px;
+          box-sizing: border-box;
+          border: 0.5px solid var(--dsw-alias-border-l3);
+          border-left-width: 2px;
+          border-radius: var(--dsw-radius-md);
+          background: var(--dsw-alias-bg-module-platform);
+          color: var(--3b-ink);
+          font-size: 12px;
+          line-height: 18px;
+        }
+        .dsh-3b-notice {
+          border-left-color: var(--dsw-alias-state-warn-primary);
+        }
+        .dsh-3b-notice.error {
+          border-left-color: var(--dsw-alias-state-error-primary);
+        }
+        .dsh-3b-notice.row {
+          align-items: center;
+          justify-content: space-between;
           flex-wrap: wrap;
         }
-        .dsh-3b-btn {
-          border: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,0.24));
-          background: var(--dsw-alias-bg-secondary, rgba(128,128,128,0.1));
-          color: var(--dsw-alias-text-primary, #e6e8ee);
-          font-size: 12.5px;
-          font-weight: 500;
-          padding: 6px 12px;
-          border-radius: 8px;
-          cursor: pointer;
+        .dsh-3b-success {
+          border-left-color: var(--dsw-alias-state-success-primary);
+        }
+        .dsh-3b-dot {
+          flex: none;
+          display: inline-block;
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          corner-shape: round;
+          background: var(--dsw-alias-state-success-primary);
+        }
+        .dsh-3b-dot.warn {
+          background: var(--dsw-alias-state-warn-primary);
+        }
+        .dsh-3b-dot.error {
+          background: var(--dsw-alias-state-error-primary);
+        }
+        .dsh-3b-warn {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          transition: all 0.15s ease;
+          color: var(--3b-ink);
         }
-        .dsh-3b-btn:hover:not(:disabled) {
-          border-color: var(--dsw-alias-interactive-primary, #3b82f6);
-          background: rgba(59, 130, 246, 0.1);
+
+        /* 卡片与按钮 */
+        .dsh-3b-card {
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          padding: 20px;
+          border: 0.5px solid var(--3b-stroke);
+          border-radius: var(--dsw-radius-xl);
+          background: var(--3b-surface);
+          color: var(--3b-ink);
+          font-family: inherit;
+          text-align: left;
+        }
+        button.dsh-3b-card {
+          cursor: pointer;
+        }
+        .dsh-3b-card.interactive {
+          transition: background-color 120ms var(--ds-ease-in-out);
+        }
+        @media (hover: hover) {
+          .dsh-3b-card.interactive:hover {
+            background: color-mix(in srgb, var(--3b-accent) 5%, var(--3b-surface));
+          }
+        }
+        .dsh-3b-card.interactive:active {
+          background: color-mix(in srgb, var(--3b-accent) 9%, var(--3b-surface));
+        }
+        .dsh-3b-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          height: 28px;
+          padding: 0 10px;
+          box-sizing: border-box;
+          border: none;
+          border-radius: var(--dsw-radius-sm);
+          box-shadow: inset 0 0 0 0.5px var(--dsw-alias-border-l3);
+          background: transparent;
+          color: var(--3b-ink);
+          font-family: inherit;
+          font-size: 12px;
+          line-height: 18px;
+          font-weight: 500;
+          white-space: nowrap;
+          cursor: pointer;
+          transition: background-color 120ms var(--ds-ease-in-out);
         }
         .dsh-3b-btn:disabled {
-          opacity: 0.5;
+          opacity: 0.4;
           cursor: not-allowed;
         }
         .dsh-3b-btn.primary {
-          background: #2563eb;
-          border-color: #3b82f6;
-          color: #ffffff;
+          box-shadow: none;
+          background: var(--dsw-alias-button-primary-fill);
+          color: var(--dsw-alias-label-primary-foreground);
         }
-        .dsh-3b-btn.primary:hover:not(:disabled) {
-          background: #1d4ed8;
-        }
-        .dsh-3b-btn.mint {
-          background: rgba(16, 185, 129, 0.15);
-          border-color: rgba(16, 185, 129, 0.35);
-          color: #10b981;
-        }
-        .dsh-3b-btn.mint:hover:not(:disabled) {
-          background: rgba(16, 185, 129, 0.25);
+        .dsh-3b-btn.ghost {
+          box-shadow: none;
+          color: var(--3b-ink-2);
         }
         .dsh-3b-btn.danger {
-          color: #f87171;
-          border-color: rgba(248, 113, 113, 0.3);
-          background: rgba(248, 113, 113, 0.08);
+          box-shadow: none;
+          color: var(--dsw-alias-state-error-primary);
         }
-        .dsh-3b-metrics-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-          gap: 14px;
+        .dsh-3b-btn.tiny {
+          height: 24px;
+          padding: 0 8px;
+          border-radius: var(--dsw-radius-xs);
+          font-size: 11px;
+          line-height: 14px;
         }
-        .dsh-3b-card {
-          background: var(--dsw-alias-bg-secondary, rgba(128,128,128,0.06));
-          border: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,0.16));
-          border-radius: 12px;
-          padding: 16px 18px;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
+        @media (hover: hover) {
+          .dsh-3b-btn:hover:not(:disabled) {
+            background: var(--dsw-alias-interactive-bg-hover);
+          }
+          .dsh-3b-btn.primary:hover:not(:disabled) {
+            background: var(--dsw-alias-button-primary-hover);
+          }
+          .dsh-3b-btn.danger:hover:not(:disabled) {
+            background: var(--dsw-alias-interactive-bg-hover-danger);
+          }
         }
-        .dsh-3b-card.interactive {
-          cursor: pointer;
-          transition: border-color 0.15s ease, transform 0.12s ease;
+        .dsh-3b-btn:active:not(:disabled) {
+          background: var(--dsw-alias-interactive-bg-active);
         }
-        .dsh-3b-card.interactive:hover {
-          border-color: #3b82f6;
-          transform: translateY(-1px);
-        }
-        .dsh-3b-metric-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          font-size: 12.5px;
-          color: var(--dsw-alias-text-secondary, #9ca3af);
-        }
-        .dsh-3b-metric-val {
-          display: flex;
-          align-items: baseline;
-          gap: 6px;
-          margin: 2px 0;
-        }
-        .dsh-3b-metric-val strong {
-          font-size: 26px;
-          font-weight: 700;
-          letter-spacing: -0.02em;
-        }
-        .dsh-3b-metric-val.mint strong { color: #10b981; }
-        .dsh-3b-metric-val.blue strong { color: #60a5fa; }
-        .dsh-3b-metric-val.amber strong { color: #fbbf24; }
-        .dsh-3b-metric-val.purple strong { color: #c084fc; }
-        .dsh-3b-metric-note {
-          font-size: 12px;
-          color: var(--dsw-alias-text-tertiary, #8b92a5);
-          margin: 0;
-          line-height: 1.45;
-        }
+
+        /* 区块标题：编号 + 标题基线对齐 */
         .dsh-3b-section-head {
           display: flex;
           flex-wrap: wrap;
-          align-items: center;
+          align-items: flex-start;
           justify-content: space-between;
-          gap: 10px;
-          margin-bottom: 6px;
+          gap: 12px 16px;
+        }
+        .dsh-3b-section-head > div {
+          min-width: 0;
         }
         .dsh-3b-section-head h2 {
-          font-size: 16px;
-          font-weight: 600;
-          margin: 0;
-        }
-        .dsh-3b-trends-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-          gap: 14px;
-        }
-        .dsh-3b-chart-head {
           display: flex;
-          flex-wrap: wrap;
-          align-items: center;
+          align-items: baseline;
+          gap: 8px;
+          margin: 0;
+          font-size: 16px;
+          line-height: 24px;
+          font-weight: 500;
+        }
+        .dsh-3b-section-index {
+          font-family: var(--ds-font-family-code);
+          font-size: 11px;
+          line-height: 14px;
+          font-weight: 400;
+          font-variant-numeric: tabular-nums;
+          color: var(--3b-ink-4);
+        }
+        .dsh-3b-section-head .dsh-3b-subtitle {
+          margin-top: 4px;
+          max-width: 62ch;
+        }
+
+        /* 核心指标 */
+        .dsh-3b-metrics-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 16px;
+        }
+        @media (min-width: 900px) {
+          .dsh-3b-metrics-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+          }
+        }
+        .dsh-3b-kpi {
+          min-height: 176px;
+        }
+        .dsh-3b-metric-head {
+          display: flex;
+          align-items: flex-start;
           justify-content: space-between;
           gap: 8px;
+          min-height: 36px;
+          font-size: 12px;
+          line-height: 18px;
+          color: var(--3b-ink-2);
+        }
+        .dsh-3b-metric-val {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: baseline;
+          gap: 2px 6px;
+          margin: 4px 0 0;
+          color: var(--3b-ink);
+        }
+        .dsh-3b-metric-val strong {
+          font-size: 24px;
+          line-height: 32px;
+          font-weight: 400;
+          font-variant-numeric: tabular-nums;
+          white-space: nowrap;
+        }
+        .dsh-3b-metric-val span {
+          font-size: 13px;
+          line-height: 20px;
+          color: var(--3b-ink-2);
+        }
+        .dsh-3b-metric-note {
+          margin: 0;
+          font-size: 12px;
+          line-height: 18px;
+          color: var(--3b-ink-3);
+        }
+        .dsh-3b-kpi .dsh-3b-metric-note {
+          margin-top: auto;
+        }
+
+        /* 六图 */
+        .dsh-3b-trends-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 16px;
+        }
+        @media (min-width: 840px) {
+          .dsh-3b-trends-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
         }
         .dsh-3b-chart-controls {
           display: flex;
+          flex-wrap: wrap;
           align-items: center;
-          justify-content: space-between;
-          width: 100%;
           gap: 8px;
+          width: 100%;
         }
-        .dsh-3b-select, .dsh-3b-input, .dsh-3b-textarea {
-          background: var(--dsw-alias-bg-primary, #12151c);
-          color: var(--dsw-alias-text-primary, #e6e8ee);
-          border: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,0.24));
-          border-radius: 7px;
-          padding: 5px 10px;
-          font-size: 12.5px;
-          font-weight: 500;
+        .dsh-3b-chart-controls .dsh-3b-select {
+          flex: 1 1 180px;
+        }
+        .dsh-3b-select,
+        .dsh-3b-input,
+        .dsh-3b-textarea {
           box-sizing: border-box;
+          background: var(--dsw-specific-selector);
+          color: var(--3b-ink);
+          border: 0.5px solid var(--dsw-alias-border-l3);
+          border-radius: var(--dsw-radius-md);
+          padding: 0 10px;
+          font-family: inherit;
+          font-size: 13px;
+          line-height: 20px;
+        }
+        .dsh-3b-select,
+        .dsh-3b-input {
+          height: 32px;
+        }
+        .dsh-3b-select {
+          min-width: 0;
+          cursor: pointer;
         }
         .dsh-3b-textarea {
           width: 100%;
-          padding: 8px 10px;
-          font-size: 13px;
-          line-height: 1.5;
+          min-height: 64px;
+          padding: 8px 12px;
           resize: vertical;
+        }
+        .dsh-3b-seg {
+          display: inline-flex;
+          flex: none;
+          padding: 4px;
+          box-sizing: border-box;
+          border-radius: var(--dsw-radius-lg);
+          background: var(--dsw-alias-bg-module-platform);
+        }
+        .dsh-3b-seg button {
+          height: 26px;
+          padding: 0 8px;
+          border: none;
+          border-radius: var(--dsw-radius-sm);
+          background: transparent;
+          color: var(--3b-ink-2);
+          font-family: inherit;
+          font-size: 12px;
+          line-height: 18px;
+          font-weight: 400;
+          font-variant-numeric: tabular-nums;
+          cursor: pointer;
+        }
+        .dsh-3b-seg button[aria-pressed='true'] {
+          background: var(--dsw-alias-bg-layer-3);
+          box-shadow: inset 0 0 0 0.5px var(--dsw-alias-border-l3);
+          color: var(--3b-ink);
+          font-weight: 500;
         }
         .dsh-3b-plot-wrap {
           display: grid;
-          grid-template-columns: 48px 1fr;
+          grid-template-columns: 44px minmax(0, 1fr);
           gap: 8px;
           align-items: stretch;
-          height: 148px;
-          margin-top: 6px;
+          height: 160px;
+          margin-top: 4px;
         }
         .dsh-3b-yaxis {
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          font-size: 10.5px;
-          color: var(--dsw-alias-text-tertiary, #8b92a5);
-          text-align: right;
           padding: 2px 0;
+          font-size: 11px;
+          line-height: 14px;
+          font-variant-numeric: tabular-nums;
+          color: var(--3b-ink-4);
+          text-align: right;
         }
         .dsh-3b-bars {
           position: relative;
           display: grid;
           align-items: end;
           height: 100%;
-          background: rgba(128,128,128,0.04);
-          border-radius: 8px;
-          padding: 6px 6px 0;
           box-sizing: border-box;
+          padding: 6px 6px 0;
+          border-radius: var(--dsw-radius-md);
+          background: var(--dsw-alias-bg-module-platform);
           overflow: hidden;
         }
+        .dsh-3b-gridline {
+          position: absolute;
+          left: 6px;
+          right: 6px;
+          height: 0;
+          border-top: 0.5px solid var(--3b-rule);
+          pointer-events: none;
+          z-index: 0;
+        }
+        .dsh-3b-gridline-1 {
+          top: 33.333%;
+        }
+        .dsh-3b-gridline-2 {
+          top: 66.666%;
+        }
         .dsh-3b-bar-slot {
+          position: relative;
+          z-index: 1;
           height: 100%;
           display: flex;
           align-items: flex-end;
         }
         .dsh-3b-bar {
           width: 100%;
-          background: linear-gradient(180deg, #3b82f6 0%, rgba(59,130,246,0.45) 100%);
+          background: color-mix(in srgb, var(--3b-accent) 36%, transparent);
           border-radius: 2px 2px 0 0;
-          transition: opacity 0.12s;
         }
-        .dsh-3b-bar:hover {
-          opacity: 0.85;
-          background: #60a5fa;
+        @media (hover: hover) {
+          .dsh-3b-bar:hover {
+            background: color-mix(in srgb, var(--3b-accent) 68%, transparent);
+          }
         }
         .dsh-3b-bar.empty {
           height: 0 !important;
@@ -357,65 +600,244 @@ window.__ModuleLoader__.load({
           overflow: visible;
         }
         .dsh-3b-mean-line {
-          stroke: #fbbf24;
-          stroke-width: 1.5;
+          stroke: var(--3b-ink-4);
+          stroke-width: 1;
           stroke-dasharray: 4 3;
+          vector-effect: non-scaling-stroke;
         }
         .dsh-3b-reg-line {
-          stroke: #10b981;
-          stroke-width: 2;
+          stroke: var(--3b-accent);
+          stroke-width: 1.5;
+          vector-effect: non-scaling-stroke;
         }
         .dsh-3b-xaxis {
           display: flex;
           justify-content: space-between;
+          gap: 12px;
+          padding-left: 52px;
           font-size: 11px;
-          color: var(--dsw-alias-text-tertiary, #8b92a5);
-          padding-left: 56px;
+          line-height: 14px;
+          font-variant-numeric: tabular-nums;
+          color: var(--3b-ink-4);
+        }
+        .dsh-3b-chart-legend {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 16px;
+          font-size: 11px;
+          line-height: 14px;
+          color: var(--3b-ink-4);
+        }
+        .dsh-3b-legend-item {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .dsh-3b-legend-swatch {
+          width: 16px;
+          height: 0;
+          border-top: 1px dashed currentColor;
+          color: var(--3b-ink-4);
+        }
+        .dsh-3b-legend-swatch.accent {
+          border-top: 1.5px solid var(--3b-accent);
+          color: var(--3b-accent);
         }
         .dsh-3b-chart-meta {
           display: flex;
           flex-wrap: wrap;
-          gap: 10px;
-          font-size: 11.5px;
-          color: var(--dsw-alias-text-secondary, #9ca3af);
-          padding-top: 4px;
-          border-top: 1px dashed var(--dsw-alias-border-l1, rgba(128,128,128,0.14));
+          gap: 8px 16px;
+          padding-top: 10px;
+          border-top: 0.5px solid var(--3b-rule);
+          font-size: 11px;
+          line-height: 14px;
+          font-variant-numeric: tabular-nums;
+          color: var(--3b-ink-4);
         }
+        .dsh-3b-empty {
+          padding: 40px 0;
+          text-align: center;
+          font-size: 12px;
+          line-height: 18px;
+          color: var(--3b-ink-4);
+        }
+
+        /* 阶段总结与训练统计 */
         .dsh-3b-period-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+          grid-template-columns: 1fr;
           gap: 12px;
         }
+        @media (min-width: 720px) {
+          .dsh-3b-period-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
         .dsh-3b-period-item {
-          background: rgba(128,128,128,0.04);
-          border: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,0.14));
-          border-radius: 10px;
-          padding: 12px 14px;
           display: flex;
           flex-direction: column;
-          gap: 5px;
+          gap: 6px;
+          padding: 14px 16px;
+          box-sizing: border-box;
+          border-radius: var(--dsw-radius-md);
+          background: var(--dsw-alias-bg-module-platform);
         }
         .dsh-3b-period-item h4 {
           margin: 0;
-          font-size: 13.5px;
-          font-weight: 600;
+          font-size: 13px;
+          line-height: 20px;
+          font-weight: 500;
+          color: var(--3b-ink);
         }
+        .dsh-3b-stat-value {
+          display: flex;
+          align-items: baseline;
+          gap: 4px;
+          font-size: 16px;
+          line-height: 24px;
+          font-weight: 500;
+          font-variant-numeric: tabular-nums;
+          color: var(--3b-ink);
+        }
+        .dsh-3b-stat-value .unit {
+          font-size: 12px;
+          line-height: 18px;
+          font-weight: 400;
+          color: var(--3b-ink-3);
+        }
+        .dsh-3b-stat-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 16px;
+        }
+        @media (min-width: 640px) {
+          .dsh-3b-stat-grid {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          }
+        }
+        .dsh-3b-meter {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .dsh-3b-meter-track {
+          flex: 1 1 auto;
+          height: 2px;
+          border-radius: 999px;
+          corner-shape: round;
+          background: var(--3b-rule);
+          overflow: hidden;
+        }
+        .dsh-3b-meter-fill {
+          display: block;
+          height: 100%;
+          border-radius: 999px;
+          corner-shape: round;
+          background: var(--3b-accent);
+        }
+
+        /* 表格 */
         .dsh-3b-table-wrap {
           overflow-x: auto;
         }
         .dsh-3b-table {
           width: 100%;
           border-collapse: collapse;
-          font-size: 12.5px;
+          font-size: 13px;
+          line-height: 20px;
+          font-variant-numeric: tabular-nums;
         }
-        .dsh-3b-table th, .dsh-3b-table td {
+        .dsh-3b-table th,
+        .dsh-3b-table td {
+          padding: 10px 12px;
+          border-bottom: 0.5px solid var(--3b-rule);
           text-align: left;
-          padding: 8px 10px;
-          border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,0.14));
+          vertical-align: top;
+        }
+        .dsh-3b-table tr:last-child td {
+          border-bottom: none;
         }
         .dsh-3b-table th {
-          color: var(--dsw-alias-text-secondary, #9ca3af);
+          font-size: 12px;
+          line-height: 18px;
           font-weight: 500;
+          color: var(--3b-ink-4);
+          white-space: nowrap;
+        }
+        .dsh-3b-table td {
+          color: var(--3b-ink);
+          overflow-wrap: anywhere;
+        }
+        .dsh-3b-table .dsh-3b-num {
+          text-align: right;
+        }
+        .dsh-3b-table .dsh-3b-nowrap {
+          white-space: nowrap;
+        }
+        .dsh-3b-table code,
+        .dsh-3b-section-head code {
+          font-family: var(--ds-font-family-code);
+          font-size: 12px;
+          line-height: 18px;
+          overflow-wrap: normal;
+        }
+
+        /* 表单 */
+        .dsh-3b-form {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .dsh-3b-field-row {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 12px 16px;
+        }
+        .dsh-3b-field {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 12px;
+          line-height: 18px;
+          color: var(--3b-ink-2);
+        }
+        .dsh-3b-field-label {
+          flex: none;
+          white-space: nowrap;
+        }
+        .dsh-3b-field-text {
+          margin: 0 0 8px;
+          font-size: 12px;
+          line-height: 18px;
+          color: var(--3b-ink-2);
+        }
+        .dsh-3b-form-actions {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+          gap: 8px;
+        }
+        .dsh-3b-field-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          min-width: 0;
+          font-size: 12px;
+          line-height: 18px;
+          color: var(--3b-ink-2);
+        }
+        .dsh-3b-goal-head {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+        .dsh-3b-goal-head .dsh-3b-field-text {
+          margin: 0;
         }
         .dsh-3b-tag-list {
           display: flex;
@@ -423,75 +845,708 @@ window.__ModuleLoader__.load({
           gap: 6px;
         }
         .dsh-3b-tag-chip {
-          border: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,0.24));
-          background: transparent;
-          color: var(--dsw-alias-text-secondary, #9ca3af);
-          font-size: 12px;
-          padding: 4px 10px;
+          height: 26px;
+          padding: 0 10px;
+          box-sizing: border-box;
+          border: 0.5px solid var(--dsw-alias-border-l3);
           border-radius: 999px;
+          corner-shape: round;
+          background: transparent;
+          color: var(--3b-ink-2);
+          font-family: inherit;
+          font-size: 12px;
+          line-height: 18px;
           cursor: pointer;
         }
         .dsh-3b-tag-chip.selected {
-          background: rgba(59, 130, 246, 0.18);
-          border-color: #3b82f6;
-          color: #60a5fa;
+          background: color-mix(in srgb, var(--3b-accent) 12%, transparent);
+          border-color: color-mix(in srgb, var(--3b-accent) 45%, transparent);
+          color: var(--3b-accent);
           font-weight: 500;
         }
+        @media (hover: hover) {
+          .dsh-3b-tag-chip:hover {
+            background: var(--dsw-alias-interactive-bg-hover);
+          }
+        }
+
+        /* 页签内容与任务报告 */
+        .dsh-3b-tab-body {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .dsh-3b-status-line {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin: 0;
+          font-size: 13px;
+          line-height: 20px;
+          font-weight: 500;
+          color: var(--3b-ink);
+        }
+        .dsh-3b-problem {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          margin: 4px 0 0;
+          font-size: 12px;
+          line-height: 18px;
+          color: var(--3b-ink-2);
+        }
+        .dsh-3b-problem .dsh-3b-dot {
+          margin-top: 6px;
+        }
+        .dsh-3b-stat-row {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+          gap: 12px 20px;
+        }
+        .dsh-3b-stat-cell {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          padding-top: 10px;
+          border-top: 0.5px solid var(--3b-rule);
+          min-width: 0;
+        }
+        .dsh-3b-stat-label {
+          font-size: 11px;
+          line-height: 14px;
+          color: var(--3b-ink-4);
+        }
+        .dsh-3b-stat-cell .dsh-3b-stat-value {
+          font-size: 13px;
+          line-height: 20px;
+          font-weight: 400;
+          overflow-wrap: anywhere;
+        }
+        .dsh-3b-pre {
+          margin: 0;
+          padding: 12px 14px;
+          box-sizing: border-box;
+          border: 0.5px solid var(--3b-rule);
+          border-radius: var(--dsw-radius-lg);
+          background: var(--dsw-alias-markdown-code-block);
+          color: var(--3b-ink);
+          font-family: var(--ds-font-family-code);
+          font-size: 12px;
+          line-height: 19px;
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+          overflow: auto;
+          max-height: 360px;
+        }
+        .dsh-3b-history {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding-top: 16px;
+          border-top: 0.5px solid var(--3b-rule);
+        }
+        .dsh-3b-history h3 {
+          margin: 0;
+          font-size: 13px;
+          line-height: 20px;
+          font-weight: 500;
+          color: var(--3b-ink);
+        }
+        .dsh-3b-title-row {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+        }
+        .dsh-3b-title-row h2 {
+          min-width: 0;
+          overflow-wrap: anywhere;
+        }
+        .dsh-3b-report,
+        .dsh-3b-details {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .dsh-3b-report h3 {
+          margin: 0;
+          font-size: 13px;
+          line-height: 20px;
+          font-weight: 500;
+        }
+        .dsh-3b-details summary {
+          cursor: pointer;
+          font-size: 12px;
+          line-height: 18px;
+          color: var(--3b-ink-2);
+        }
+        .dsh-3b-details-list {
+          margin: 0;
+          padding-left: 18px;
+          font-size: 12px;
+          line-height: 18px;
+          color: var(--3b-ink-3);
+        }
+        .dsh-3b-card > summary {
+          cursor: pointer;
+          font-size: 13px;
+          line-height: 20px;
+          font-weight: 500;
+          color: var(--3b-ink);
+        }
+        .dsh-3b-details-body {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .dsh-3b-ai-metrics {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 12px;
+        }
+        .dsh-3b-privacy {
+          align-items: center;
+          padding: 48px 24px;
+          text-align: center;
+        }
+        .dsh-3b-privacy h2 {
+          margin: 0 0 8px;
+          font-size: 16px;
+          line-height: 24px;
+          font-weight: 500;
+        }
+
+        /* 弹窗 */
         .dsh-3b-modal-backdrop {
           position: fixed;
           inset: 0;
-          background: rgba(0, 0, 0, 0.62);
+          z-index: 9999;
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 9999;
-          padding: 20px;
+          padding: 24px;
+          box-sizing: border-box;
+          background: var(--dsw-alias-bg-mask-1);
+        }
+        .dsh-3b-modal.wide {
+          max-width: 860px;
         }
         .dsh-3b-modal {
-          background: var(--dsw-alias-bg-primary, #161920);
-          border: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,0.28));
-          border-radius: 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
           width: 100%;
           max-width: 680px;
           max-height: 86vh;
+          padding: 24px;
+          box-sizing: border-box;
           overflow-y: auto;
-          padding: 20px 24px;
-          display: flex;
-          flex-direction: column;
-          gap: 14px;
-          box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+          border: 0;
+          border-radius: var(--dsw-radius-panel);
+          background: var(--dsw-alias-bg-layer-1);
+          box-shadow: var(--dsw-elevation-panel);
+          color: var(--3b-ink);
         }
-        .dsh-3b-notice {
-          padding: 10px 14px;
-          border-radius: 8px;
-          background: rgba(245, 158, 11, 0.12);
-          border: 1px solid rgba(245, 158, 11, 0.3);
-          color: #fbbf24;
-          font-size: 12.5px;
-          line-height: 1.5;
+        .dsh-3b-modal .dsh-3b-nav {
+          flex: 0 0 auto;
+          align-self: flex-start;
+        }
+        .dsh-3b-modal-head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 16px;
+        }
+        .dsh-3b-modal-title {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+        }
+        .dsh-3b-modal-title h2 {
+          margin: 0;
+          font-size: 16px;
+          line-height: 24px;
+          font-weight: 500;
+        }
+
+        @media (max-width: 639px) {
+          .dsh-3b-health-root {
+            padding-top: calc(20px + var(--dsh-frame-top-clearance, 0px));
+            padding-bottom: 32px;
+          }
+          .dsh-3b-field {
+            display: flex;
+            width: 100%;
+            max-width: 100%;
+          }
+          .dsh-3b-field .dsh-3b-select,
+          .dsh-3b-field .dsh-3b-input {
+            flex: 1 1 auto;
+            min-width: 0;
+            max-width: 100%;
+          }
+          .dsh-3b-actions {
+            width: 100%;
+          }
+          .dsh-3b-metrics-grid {
+            grid-template-columns: 1fr;
+          }
+          .dsh-3b-kpi {
+            min-height: 0;
+          }
+          .dsh-3b-plot-wrap {
+            grid-template-columns: 36px minmax(0, 1fr);
+            height: 140px;
+          }
+          .dsh-3b-xaxis {
+            padding-left: 44px;
+          }
+          .dsh-3b-modal-backdrop {
+            padding: 16px;
+          }
+          .dsh-3b-modal {
+            padding: 20px;
+            max-height: 92vh;
+          }
+        }
+        @media (pointer: coarse) {
+          .dsh-3b-btn {
+            height: 36px;
+            padding: 0 12px;
+            font-size: 13px;
+          }
+          .dsh-3b-btn.tiny {
+            height: 32px;
+            font-size: 12px;
+          }
+          .dsh-3b-select,
+          .dsh-3b-input {
+            height: 36px;
+            font-size: 16px;
+          }
+          .dsh-3b-textarea {
+            font-size: 16px;
+          }
+          .dsh-3b-tab {
+            height: 38px;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .dsh-3b-card,
+          .dsh-3b-btn,
+          .dsh-3b-tab {
+            transition: none;
+          }
+        }
+        /* ===== 杂志风皮肤（墨水经典 · 午夜墨） =====
+           纸面 + 衬线标题 + 三线表；UI 正文保持无衬线以保证密度可读。
+           切换纸色/墨色/锚点色只需改这一段。 */
+        .dsh-3b-health-root {
+          --3b-paper: #f1efea;
+          --3b-paper-2: #f7f5f1;
+          --3b-ink: #0a0a0b;
+          --3b-ink-2: #3f3d39;
+          --3b-ink-3: #6b675f;
+          --3b-ink-4: #8a857c;
+          --3b-rule: rgba(10, 10, 11, 0.16);
+          --3b-rule-strong: rgba(10, 10, 11, 0.55);
+          --3b-texture: rgba(10, 10, 11, 0.028);
+          --3b-accent: #111111;
+          --3b-accent-on: #f1efea;
+          --3b-chart-bar: #56b7e6;
+          --3b-success: #2e6b4f;
+          --3b-warn: #9b5a2e;
+          --3b-error: #a33a2f;
+          --3b-mask: rgba(10, 10, 11, 0.45);
+          --3b-code-bg: #0a0a0b;
+          --3b-code-ink: #f1efea;
+          --3b-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', Georgia, 'Times New Roman', serif;
+          --3b-sans: var(--dsw-font-family);
+          --3b-mono: var(--ds-font-family-code);
+          --3b-surface: var(--3b-paper-2);
+          --3b-stroke: var(--3b-rule);
+          --dsw-focus-ring-color: var(--3b-ink);
+          accent-color: var(--3b-ink);
+          caret-color: var(--3b-ink);
+          background: var(--3b-paper);
+          scrollbar-color: var(--3b-ink-4) transparent;
+        }
+        body[data-ds-dark-theme] .dsh-3b-health-root {
+          --3b-paper: #0e0d0c;
+          --3b-paper-2: #171512;
+          --3b-ink: #ece2cf;
+          --3b-ink-2: #c8bda9;
+          --3b-ink-3: #948b7c;
+          --3b-ink-4: #8a8172;
+          --3b-rule: rgba(236, 226, 207, 0.16);
+          --3b-rule-strong: rgba(236, 226, 207, 0.55);
+          --3b-texture: rgba(236, 226, 207, 0.04);
+          --3b-accent: #d4a04a;
+          --3b-accent-on: #0e0d0c;
+          --3b-chart-bar: #56b7e6;
+          --3b-success: #7fbf9a;
+          --3b-warn: #d9a76a;
+          --3b-error: #e08a7d;
+          --3b-mask: rgba(0, 0, 0, 0.66);
+          --3b-code-bg: #1a1714;
+          --3b-code-ink: #ece2cf;
+        }
+        .dsh-3b-health-root ::selection {
+          background: var(--3b-ink);
+          color: var(--3b-paper);
+        }
+
+        /* 页头与页签 */
+        .dsh-3b-topbar {
+          padding-bottom: 18px;
+          border-bottom: 1px solid var(--3b-rule-strong);
+        }
+        .dsh-3b-title {
+          font-family: var(--3b-serif);
+          font-size: 26px;
+          line-height: 34px;
+          font-weight: 500;
+          letter-spacing: 0.02em;
+        }
+        .dsh-3b-subtitle {
+          font-size: 12px;
+          line-height: 18px;
+          color: var(--3b-ink-3);
+        }
+        .dsh-3b-path {
+          font-family: var(--3b-mono);
+          font-size: 11px;
+          line-height: 16px;
+          color: var(--3b-ink-4);
+        }
+        .dsh-3b-nav {
+          padding: 0;
+          border-radius: 0;
+          background: transparent;
+        }
+        .dsh-3b-tab {
+          position: relative;
+          height: 38px;
+          border-radius: 0;
+          font-size: 14px;
+          color: var(--3b-ink-3);
+        }
+        .dsh-3b-tab.active {
+          background: transparent;
+          color: var(--3b-ink);
+          box-shadow: none;
+        }
+        .dsh-3b-tab.active::after {
+          content: '';
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          height: 2px;
+          background: var(--3b-ink);
+        }
+        @media (hover: hover) {
+          .dsh-3b-tab:hover {
+            color: var(--3b-ink);
+          }
+        }
+
+        /* 标题、编号与数字 */
+        .dsh-3b-section-head h2 {
+          font-family: var(--3b-serif);
+          font-size: 18px;
+          line-height: 26px;
+          font-weight: 500;
+          letter-spacing: 0.02em;
+        }
+        .dsh-3b-section-index {
+          font-family: var(--3b-mono);
+          color: var(--3b-ink-4);
+        }
+        .dsh-3b-metric-val strong {
+          font-family: var(--3b-serif);
+          font-size: 26px;
+          line-height: 34px;
+          font-weight: 400;
+        }
+        .dsh-3b-metric-val span {
+          font-size: 12px;
+          line-height: 18px;
+          color: var(--3b-ink-3);
+        }
+        .dsh-3b-stat-value {
+          font-family: var(--3b-serif);
+          font-size: 18px;
+          line-height: 26px;
+          font-weight: 500;
+        }
+        .dsh-3b-stat-value .unit {
+          font-family: var(--3b-sans);
+          font-size: 11px;
+          line-height: 16px;
+          color: var(--3b-ink-3);
+        }
+        .dsh-3b-modal-title h2,
+        .dsh-3b-privacy h2 {
+          font-family: var(--3b-serif);
+          font-size: 18px;
+          line-height: 26px;
+          font-weight: 500;
+        }
+        .dsh-3b-period-item h4,
+        .dsh-3b-report h3,
+        .dsh-3b-history h3 {
+          font-size: 13px;
+          line-height: 20px;
+          font-weight: 500;
+        }
+        .dsh-3b-metric-head {
+          font-size: 11.5px;
+          line-height: 17px;
+          color: var(--3b-ink-3);
+        }
+        .dsh-3b-metric-note {
+          font-size: 11.5px;
+          line-height: 17px;
+          color: var(--3b-ink-3);
+        }
+
+        /* 卡片、按钮与标签 */
+        .dsh-3b-card {
+          background: var(--3b-surface);
+          border: 1px solid var(--3b-stroke);
+          border-radius: 3px;
+        }
+        @media (hover: hover) {
+          .dsh-3b-card.interactive:hover {
+            background: color-mix(in srgb, var(--3b-ink) 4%, var(--3b-surface));
+          }
+        }
+        .dsh-3b-card.interactive:active {
+          background: color-mix(in srgb, var(--3b-ink) 7%, var(--3b-surface));
+        }
+        .dsh-3b-btn {
+          height: 28px;
+          border-radius: 2px;
+          box-shadow: inset 0 0 0 1px var(--3b-rule);
+          color: var(--3b-ink);
+          font-size: 12px;
+        }
+        .dsh-3b-btn.primary {
+          box-shadow: none;
+          background: var(--3b-ink);
+          color: var(--3b-accent-on);
+        }
+        .dsh-3b-btn.ghost {
+          box-shadow: none;
+          color: var(--3b-ink-3);
+        }
+        .dsh-3b-btn.danger {
+          box-shadow: none;
+          color: var(--3b-error);
+        }
+        @media (hover: hover) {
+          .dsh-3b-btn:hover:not(:disabled) {
+            background: color-mix(in srgb, var(--3b-ink) 6%, transparent);
+          }
+          .dsh-3b-btn.primary:hover:not(:disabled) {
+            background: color-mix(in srgb, var(--3b-ink) 82%, var(--3b-paper));
+          }
+          .dsh-3b-btn.danger:hover:not(:disabled) {
+            background: color-mix(in srgb, var(--3b-error) 8%, transparent);
+          }
+        }
+        .dsh-3b-btn:active:not(:disabled) {
+          background: color-mix(in srgb, var(--3b-ink) 10%, transparent);
+        }
+        .dsh-3b-badge {
+          height: 19px;
+          padding: 0 6px;
+          border: 1px solid var(--3b-rule);
+          border-radius: 2px;
+          corner-shape: round;
+          background: transparent;
+          color: var(--3b-ink-3);
+          font-size: 10.5px;
+          line-height: 14px;
+        }
+        .dsh-3b-badge.accent {
+          background: transparent;
+          border-color: var(--3b-ink-2);
+          color: var(--3b-ink);
+        }
+        .dsh-3b-badge.success {
+          background: transparent;
+          border-color: color-mix(in srgb, var(--3b-success) 60%, transparent);
+          color: var(--3b-success);
+        }
+        .dsh-3b-badge.warn {
+          background: transparent;
+          border-color: color-mix(in srgb, var(--3b-warn) 60%, transparent);
+          color: var(--3b-warn);
+        }
+
+        /* 提示、输入与分段控件 */
+        .dsh-3b-notice,
+        .dsh-3b-success {
+          border: 1px solid var(--3b-rule);
+          border-left: 2px solid var(--3b-warn);
+          border-radius: 2px;
+          background: transparent;
+          color: var(--3b-ink);
+          font-size: 12px;
+        }
+        .dsh-3b-notice.error {
+          border-left-color: var(--3b-error);
         }
         .dsh-3b-success {
-          padding: 10px 14px;
-          border-radius: 8px;
-          background: rgba(16, 185, 129, 0.12);
-          border: 1px solid rgba(16, 185, 129, 0.3);
-          color: #34d399;
-          font-size: 12.5px;
-          line-height: 1.5;
+          border-left-color: var(--3b-success);
+        }
+        .dsh-3b-dot {
+          background: var(--3b-success);
+        }
+        .dsh-3b-dot.warn {
+          background: var(--3b-warn);
+        }
+        .dsh-3b-dot.error {
+          background: var(--3b-error);
+        }
+        .dsh-3b-select,
+        .dsh-3b-input,
+        .dsh-3b-textarea {
+          background: var(--3b-paper);
+          border: 1px solid var(--3b-rule);
+          border-radius: 2px;
+          color: var(--3b-ink);
+        }
+        .dsh-3b-textarea::placeholder {
+          color: var(--3b-ink-4);
+        }
+        .dsh-3b-seg {
+          padding: 2px;
+          border: 1px solid var(--3b-rule);
+          border-radius: 2px;
+          background: transparent;
+        }
+        .dsh-3b-seg button {
+          height: 24px;
+          border-radius: 0;
+          color: var(--3b-ink-3);
+          font-size: 12px;
+        }
+        .dsh-3b-seg button[aria-pressed='true'] {
+          background: var(--3b-ink);
+          box-shadow: none;
+          color: var(--3b-accent-on);
+        }
+        .dsh-3b-tag-chip {
+          height: 26px;
+          border: 1px solid var(--3b-rule);
+          border-radius: 2px;
+          corner-shape: round;
+          color: var(--3b-ink-3);
+        }
+        .dsh-3b-tag-chip.selected {
+          background: var(--3b-ink);
+          border-color: var(--3b-ink);
+          color: var(--3b-accent-on);
+        }
+        @media (hover: hover) {
+          .dsh-3b-tag-chip:hover {
+            background: color-mix(in srgb, var(--3b-ink) 6%, transparent);
+          }
+        }
+
+        /* 图表：纸面 + 交叉线纹理 + 墨色柱 */
+        .dsh-3b-bars {
+          background-color: var(--3b-paper);
+          background-image:
+            repeating-linear-gradient(45deg, transparent 0 10px, var(--3b-texture) 10px 10.5px),
+            repeating-linear-gradient(-45deg, transparent 0 10px, var(--3b-texture) 10px 10.5px);
+          border: 1px solid var(--3b-rule);
+          border-radius: 2px;
+        }
+        .dsh-3b-gridline {
+          border-top: 1px solid var(--3b-rule);
+        }
+        .dsh-3b-bar {
+          border-radius: 0;
+          background: var(--3b-chart-bar);
+        }
+        @media (hover: hover) {
+          .dsh-3b-bar:hover {
+            background: color-mix(in srgb, var(--3b-chart-bar) 84%, var(--3b-ink));
+          }
+        }
+        .dsh-3b-mean-line {
+          stroke: var(--3b-ink-4);
+        }
+        .dsh-3b-reg-line {
+          stroke: var(--3b-accent);
+        }
+        .dsh-3b-yaxis,
+        .dsh-3b-xaxis,
+        .dsh-3b-chart-meta,
+        .dsh-3b-chart-legend {
+          font-family: var(--3b-mono);
+          font-size: 10.5px;
+          color: var(--3b-ink-4);
+        }
+        .dsh-3b-chart-meta {
+          border-top: 1px solid var(--3b-rule);
+        }
+
+        /* 三线表 */
+        .dsh-3b-table {
+          border-top: 2px solid var(--3b-ink);
+        }
+        .dsh-3b-table th {
+          border-bottom: 1px solid var(--3b-rule-strong);
+          color: var(--3b-ink-3);
+          font-size: 11px;
+          line-height: 16px;
+        }
+        .dsh-3b-table td {
+          border-bottom: 1px solid var(--3b-rule);
+        }
+
+        /* 弹窗、代码块与进度条 */
+        .dsh-3b-modal-backdrop {
+          background: var(--3b-mask);
+        }
+        .dsh-3b-modal {
+          border: 1px solid var(--3b-rule-strong);
+          border-radius: 3px;
+          background: var(--3b-paper);
+          box-shadow: none;
         }
         .dsh-3b-pre {
-          background: rgba(0,0,0,0.28);
-          border: 1px solid var(--dsw-alias-border-l1, rgba(128,128,128,0.18));
-          border-radius: 8px;
-          padding: 12px;
-          font-size: 12px;
-          line-height: 1.5;
-          overflow-x: auto;
-          white-space: pre-wrap;
-          word-break: break-word;
-          max-height: 320px;
+          border: 0;
+          border-radius: 2px;
+          background: var(--3b-code-bg);
+          color: var(--3b-code-ink);
+        }
+        .dsh-3b-period-item {
+          background: var(--3b-paper);
+        }
+        .dsh-3b-meter-track {
+          background: var(--3b-rule);
+        }
+        .dsh-3b-meter-fill {
+          background: var(--3b-ink);
         }
       `
+      const existing = document.getElementById(STYLE_ID)
+      if (existing) {
+        if (existing.textContent !== css) existing.textContent = css
+        return
+      }
+      const style = document.createElement('style')
+      style.id = STYLE_ID
+      style.textContent = css
       document.head.appendChild(style)
     }
 
@@ -593,7 +1648,7 @@ window.__ModuleLoader__.load({
           viewBox: '0 0 24 24',
           fill: 'none',
           stroke: 'currentColor',
-          strokeWidth: 1.85,
+          strokeWidth: 1.75,
           strokeLinecap: 'round',
           strokeLinejoin: 'round',
           'aria-hidden': 'true',
@@ -603,14 +1658,14 @@ window.__ModuleLoader__.load({
       )
     }
 
-    /** Single Trend Chart Card (Dropdown-only header, no duplicate numbered title) */
+    /** Single Trend Chart Card (metric select + 30/90/365 segmented period control) */
     function TrendChartCard({ slotIndex, trendData, metricsList, activeMetricId, days, onSelectMetric, onSelectPeriod }) {
       const active = useMemo(
         () => metricsList.find(m => m.id === activeMetricId) || metricsList[0] || null,
         [metricsList, activeMetricId],
       )
       if (!active) {
-        return h('div', { className: 'dsh-3b-card' }, h('p', { className: 'dsh-3b-metric-note' }, `趋势图 ${slotIndex + 1} 暂无可用指标`))
+        return h('div', { className: 'dsh-3b-card' }, h('p', { className: 'dsh-3b-empty' }, `趋势图 ${slotIndex + 1} 暂无可用指标`))
       }
 
       const { dates, values, limited, loadedDays } = healthTrendSeries(trendData, active, days)
@@ -637,31 +1692,30 @@ window.__ModuleLoader__.load({
         { className: 'dsh-3b-card' },
         h(
           'div',
-          { className: 'dsh-3b-chart-head' },
+          { className: 'dsh-3b-chart-controls' },
+          h(
+            'select',
+            {
+              className: 'dsh-3b-select',
+              value: active.id,
+              'aria-label': `趋势 ${slotIndex + 1} 指标`,
+              onChange: e => onSelectMetric(slotIndex, e.target.value),
+            },
+            metricsList.map(m => h('option', { key: m.id, value: m.id }, healthTrendLabel(m))),
+          ),
           h(
             'div',
-            { className: 'dsh-3b-chart-controls' },
-            h(
-              'select',
+            { className: 'dsh-3b-seg', role: 'group', 'aria-label': `趋势 ${slotIndex + 1} 时间段` },
+            PERIOD_OPTIONS.map(d => h(
+              'button',
               {
-                className: 'dsh-3b-select',
-                style: { flex: '1 1 auto', minWidth: '150px' },
-                value: active.id,
-                'aria-label': `趋势 ${slotIndex + 1} 指标`,
-                onChange: e => onSelectMetric(slotIndex, e.target.value),
+                key: d,
+                type: 'button',
+                'aria-pressed': days === d,
+                onClick: () => onSelectPeriod(slotIndex, d),
               },
-              metricsList.map(m => h('option', { key: m.id, value: m.id }, healthTrendLabel(m))),
-            ),
-            h(
-              'select',
-              {
-                className: 'dsh-3b-select',
-                value: days,
-                'aria-label': `趋势 ${slotIndex + 1} 时间段`,
-                onChange: e => onSelectPeriod(slotIndex, Number(e.target.value)),
-              },
-              PERIOD_OPTIONS.map(d => h('option', { key: d, value: d }, `${d}天`)),
-            ),
+              `${d}天`,
+            )),
           ),
         ),
         numbers.length > 0
@@ -685,6 +1739,8 @@ window.__ModuleLoader__.load({
                     columnGap: values.length > 90 ? '0px' : values.length > 30 ? '1px' : '2px',
                   },
                 },
+                h('div', { className: 'dsh-3b-gridline dsh-3b-gridline-1', 'aria-hidden': 'true' }),
+                h('div', { className: 'dsh-3b-gridline dsh-3b-gridline-2', 'aria-hidden': 'true' }),
                 values.map((v, idx) => {
                   const pct = v == null ? 0 : flat ? 50 : Math.max(2, ((v - low) / span) * 100)
                   return h(
@@ -724,22 +1780,23 @@ window.__ModuleLoader__.load({
               'div',
               { className: 'dsh-3b-xaxis' },
               h('span', null, dates[0] || ''),
-              h('span', null, `${active.unit || '无单位'} · 虚线均值 / 绿线线性回归`),
               h('span', null, dates[dates.length - 1] || ''),
             ),
+            h(
+              'div',
+              { className: 'dsh-3b-chart-legend' },
+              h('span', { className: 'dsh-3b-legend-item' }, h('span', { className: 'dsh-3b-legend-swatch', 'aria-hidden': 'true' }), '均值'),
+              h('span', { className: 'dsh-3b-legend-item' }, h('span', { className: 'dsh-3b-legend-swatch accent', 'aria-hidden': 'true' }), '线性回归'),
+            ),
           )
-          : h(
-            'div',
-            { style: { padding: '32px 0', textAlign: 'center', color: 'var(--dsw-alias-text-tertiary, #8b92a5)', fontSize: '12.5px' } },
-            `该指标在最近 ${days} 天暂无可用记录`,
-          ),
+          : h('p', { className: 'dsh-3b-empty' }, `该指标在最近 ${days} 天暂无可用记录`),
         h(
           'div',
           { className: 'dsh-3b-chart-meta' },
           h('span', null, `最新：${latestObs ? `${formatNum(latestObs.value, 2)} ${active.unit || ''} (${latestObs.date})` : '—'}`),
           h('span', null, `均值：${formatNum(average, 2)} ${active.unit || ''}`),
           h('span', null, `有效日：${numbers.length}/${days}`),
-          limited && h('span', { style: { color: '#fbbf24' } }, `已载入 ${loadedDays} 天`),
+          limited && h('span', { className: 'dsh-3b-warn' }, h('span', { className: 'dsh-3b-dot warn', 'aria-hidden': 'true' }), `已载入 ${loadedDays} 天`),
         ),
       )
     }
@@ -816,26 +1873,37 @@ window.__ModuleLoader__.load({
         { className: 'dsh-3b-modal-backdrop', onClick: onClose },
         h(
           'div',
-          { className: 'dsh-3b-modal', onClick: e => e.stopPropagation() },
+          {
+            className: 'dsh-3b-modal',
+            role: 'dialog',
+            'aria-modal': 'true',
+            'aria-labelledby': 'dsh-3b-checkin-title',
+            onClick: e => e.stopPropagation(),
+          },
           h(
             'div',
-            { className: 'dsh-3b-section-head' },
+            { className: 'dsh-3b-modal-head' },
             h(
               'div',
-              { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
-              h('h2', null, category === 'diet' ? '饮食记录打卡' : '精力自评打卡'),
+              { className: 'dsh-3b-modal-title' },
+              h('h2', { id: 'dsh-3b-checkin-title' }, category === 'diet' ? '饮食记录打卡' : '精力自评打卡'),
               h('span', { className: 'dsh-3b-badge' }, '通过 dsh 3B健康插件写入'),
             ),
-            h('button', { className: 'dsh-3b-btn', onClick: onClose }, '关闭'),
+            h(
+              'button',
+              { type: 'button', className: 'dsh-3b-btn ghost', onClick: onClose },
+              '关闭',
+            ),
           ),
           h(
             'div',
-            { className: 'dsh-3b-nav', style: { alignSelf: 'flex-start' } },
+            { className: 'dsh-3b-nav' },
             h(
               'button',
               {
                 type: 'button',
                 className: 'dsh-3b-tab' + (category === 'diet' ? ' active' : ''),
+                'aria-pressed': category === 'diet',
                 onClick: () => switchCategory('diet'),
               },
               '饮食记录',
@@ -845,21 +1913,22 @@ window.__ModuleLoader__.load({
               {
                 type: 'button',
                 className: 'dsh-3b-tab' + (category === 'energy' ? ' active' : ''),
+                'aria-pressed': category === 'energy',
                 onClick: () => switchCategory('energy'),
               },
               '精力自评',
             ),
           ),
-          err && h('div', { className: 'dsh-3b-notice' }, err),
+          err && h('div', { className: 'dsh-3b-notice error' }, err),
           h(
             'form',
-            { onSubmit: handleSubmit, style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
+            { className: 'dsh-3b-form', onSubmit: handleSubmit },
             h(
               'div',
-              { style: { display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' } },
+              { className: 'dsh-3b-field-row' },
               h(
                 'label',
-                { style: { fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px' } },
+                { className: 'dsh-3b-field' },
                 '日期：',
                 h('input', {
                   type: 'date',
@@ -870,7 +1939,7 @@ window.__ModuleLoader__.load({
               ),
               category === 'diet' && h(
                 'label',
-                { style: { fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px' } },
+                { className: 'dsh-3b-field' },
                 '餐次：',
                 h(
                   'select',
@@ -884,7 +1953,7 @@ window.__ModuleLoader__.load({
               ),
               h(
                 'label',
-                { style: { fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px' } },
+                { className: 'dsh-3b-field' },
                 category === 'diet' ? '饮食健康度 (1-5分)：' : '今日精力评分 (1-10分)：',
                 h(
                   'select',
@@ -902,7 +1971,7 @@ window.__ModuleLoader__.load({
             h(
               'div',
               null,
-              h('div', { style: { fontSize: '12px', color: 'var(--dsw-alias-text-secondary, #9ca3af)', marginBottom: '6px' } }, '快捷标签（可多选）：'),
+              h('div', { className: 'dsh-3b-field-text' }, '快捷标签（可多选）：'),
               h(
                 'div',
                 { className: 'dsh-3b-tag-list' },
@@ -931,7 +2000,7 @@ window.__ModuleLoader__.load({
             }),
             h(
               'div',
-              { style: { display: 'flex', justifyContent: 'flex-end', gap: '8px' } },
+              { className: 'dsh-3b-form-actions' },
               h(
                 'button',
                 { type: 'submit', className: 'dsh-3b-btn primary', disabled: busy },
@@ -941,10 +2010,10 @@ window.__ModuleLoader__.load({
           ),
           h(
             'div',
-            { style: { borderTop: '1px solid var(--dsw-alias-border-l1, rgba(128,128,128,0.18))', paddingTop: '12px' } },
-            h('h3', { style: { fontSize: '13.5px', margin: '0 0 8px' } }, `近期${category === 'diet' ? '饮食记录' : '精力自评'}（最近 30 天）`),
+            { className: 'dsh-3b-history' },
+            h('h3', null, `近期${category === 'diet' ? '饮食记录' : '精力自评'}（最近 30 天）`),
             filteredHistory.length === 0
-              ? h('p', { className: 'dsh-3b-metric-note' }, '尚无记录，可在上方添加第一条打卡。')
+              ? h('p', { className: 'dsh-3b-empty' }, '尚无记录，可在上方添加第一条打卡。')
               : h(
                 'div',
                 { className: 'dsh-3b-table-wrap' },
@@ -957,12 +2026,12 @@ window.__ModuleLoader__.load({
                     h(
                       'tr',
                       null,
-                      h('th', null, '日期'),
-                      category === 'diet' && h('th', null, '餐次'),
-                      h('th', null, '评分'),
-                      h('th', null, '标签与备注'),
-                      h('th', null, '写入来源'),
-                      h('th', null, '操作'),
+                      h('th', { scope: 'col' }, '日期'),
+                      category === 'diet' && h('th', { scope: 'col' }, '餐次'),
+                      h('th', { scope: 'col' }, '评分'),
+                      h('th', { scope: 'col' }, '标签与备注'),
+                      h('th', { scope: 'col' }, '写入来源'),
+                      h('th', { scope: 'col' }, '操作'),
                     ),
                   ),
                   h(
@@ -972,9 +2041,9 @@ window.__ModuleLoader__.load({
                       h(
                         'tr',
                         { key: row.id },
-                        h('td', null, row.record_date),
+                        h('td', { className: 'dsh-3b-nowrap' }, row.record_date),
                         category === 'diet' && h('td', null, row.meal_type || '—'),
-                        h('td', null, row.score != null ? `${row.score} 分` : '—'),
+                        h('td', { className: 'dsh-3b-nowrap' }, row.score != null ? `${row.score} 分` : '—'),
                         h(
                           'td',
                           null,
@@ -989,8 +2058,7 @@ window.__ModuleLoader__.load({
                             'button',
                             {
                               type: 'button',
-                              className: 'dsh-3b-btn danger',
-                              style: { padding: '2px 8px', fontSize: '11.5px' },
+                              className: 'dsh-3b-btn danger tiny',
                               disabled: busy,
                               onClick: () => handleDelete(row.id),
                             },
@@ -1024,17 +2092,27 @@ window.__ModuleLoader__.load({
         { className: 'dsh-3b-modal-backdrop', onClick: onClose },
         h(
           'div',
-          { className: 'dsh-3b-modal', style: { maxWidth: '780px' }, onClick: e => e.stopPropagation() },
+          {
+            className: 'dsh-3b-modal wide',
+            role: 'dialog',
+            'aria-modal': 'true',
+            'aria-labelledby': 'dsh-3b-traces-title',
+            onClick: e => e.stopPropagation(),
+          },
           h(
             'div',
-            { className: 'dsh-3b-section-head' },
+            { className: 'dsh-3b-modal-head' },
             h(
               'div',
-              { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
-              h('h2', null, '插件写入留痕记录'),
+              { className: 'dsh-3b-modal-title' },
+              h('h2', { id: 'dsh-3b-traces-title' }, '插件写入留痕记录'),
               h('span', { className: 'dsh-3b-badge' }, '通过 dsh 3B健康插件写入'),
             ),
-            h('button', { className: 'dsh-3b-btn', onClick: onClose }, '关闭'),
+            h(
+              'button',
+              { type: 'button', className: 'dsh-3b-btn ghost', onClick: onClose },
+              '关闭',
+            ),
           ),
           h(
             'p',
@@ -1042,9 +2120,9 @@ window.__ModuleLoader__.load({
             '所有通过 DSH「3B健康」插件执行的打卡、偏好配置、同步触发与分析任务生成，均在 SQLite (dsh_plugin_traces) 与 dsh-plugin-traces.jsonl 双重留痕。',
           ),
           loading
-            ? h('p', { className: 'dsh-3b-metric-note' }, '正在读取写入留痕…')
+            ? h('p', { className: 'dsh-3b-empty' }, '正在读取写入留痕…')
             : traces.length === 0
-              ? h('p', { className: 'dsh-3b-metric-note' }, '尚无插件写入记录。')
+              ? h('p', { className: 'dsh-3b-empty' }, '尚无插件写入记录。')
               : h(
                 'div',
                 { className: 'dsh-3b-table-wrap' },
@@ -1057,10 +2135,10 @@ window.__ModuleLoader__.load({
                     h(
                       'tr',
                       null,
-                      h('th', null, '时间'),
-                      h('th', null, '动作'),
-                      h('th', null, '留痕摘要'),
-                      h('th', null, '来源标识'),
+                      h('th', { scope: 'col' }, '时间'),
+                      h('th', { scope: 'col' }, '动作'),
+                      h('th', { scope: 'col' }, '留痕摘要'),
+                      h('th', { scope: 'col' }, '来源标识'),
                     ),
                   ),
                   h(
@@ -1070,7 +2148,7 @@ window.__ModuleLoader__.load({
                       h(
                         'tr',
                         { key: item.id },
-                        h('td', { style: { whiteSpace: 'nowrap' } }, String(item.created_at || '').replace('T', ' ').slice(0, 19)),
+                        h('td', { className: 'dsh-3b-nowrap' }, String(item.created_at || '').replace('T', ' ').slice(0, 19)),
                         h('td', null, h('code', null, item.action)),
                         h('td', null, item.summary),
                         h('td', null, h('span', { className: 'dsh-3b-badge' }, item.source_label)),
@@ -1102,7 +2180,9 @@ window.__ModuleLoader__.load({
 
       useEffect(() => {
         loadSync()
-        const timer = setInterval(loadSync, 15000)
+        const timer = setInterval(() => {
+          if (typeof document === 'undefined' || !document.hidden) loadSync()
+        }, 60000)
         return () => clearInterval(timer)
       }, [loadSync])
 
@@ -1129,9 +2209,9 @@ window.__ModuleLoader__.load({
 
       return h(
         'div',
-        { style: { display: 'flex', flexDirection: 'column', gap: '16px' } },
+        { className: 'dsh-3b-tab-body' },
         issue && h('div', { className: 'dsh-3b-notice' }, `健康同步提醒：${issue}`),
-        err && h('div', { className: 'dsh-3b-notice' }, err),
+        err && h('div', { className: 'dsh-3b-notice error' }, err),
         msg && h('div', { className: 'dsh-3b-success' }, msg),
         h(
           'section',
@@ -1141,13 +2221,17 @@ window.__ModuleLoader__.load({
             { className: 'dsh-3b-section-head' },
             h(
               'div',
-              { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
-              h('h2', null, 'iCloud 文件夹自动同步'),
-              h('span', { className: 'dsh-3b-badge blue' }, 'DataCenter 每 5 分钟'),
+              null,
+              h(
+                'div',
+                { className: 'dsh-3b-title-row' },
+                h('h2', null, 'iCloud 文件夹自动同步'),
+                h('span', { className: 'dsh-3b-badge accent' }, 'DataCenter 每 5 分钟'),
+              ),
             ),
             h(
               'button',
-              { className: 'dsh-3b-btn primary', disabled: busy, onClick: handleTriggerSync },
+              { className: 'dsh-3b-btn', disabled: busy, onClick: handleTriggerSync },
               busy ? '正在刷新状态…' : '刷新状态（只读）',
             ),
           ),
@@ -1156,23 +2240,55 @@ window.__ModuleLoader__.load({
               React.Fragment,
               null,
               h(
-                'p',
-                { style: { margin: '4px 0', fontSize: '13px' } },
-                `${folder.phase === 'checking' ? '本次检查启动：' : '最近检查时间：'}${folder.checked_at ? new Date(folder.checked_at).toLocaleString('zh-CN') : '未知'}`,
+                'div',
+                { className: 'dsh-3b-stat-row' },
+                h(
+                  'div',
+                  { className: 'dsh-3b-stat-cell' },
+                  h('span', { className: 'dsh-3b-stat-label' }, folder.phase === 'checking' ? '本次检查启动' : '最近检查'),
+                  h('span', { className: 'dsh-3b-stat-value' }, folder.checked_at ? new Date(folder.checked_at).toLocaleString('zh-CN') : '未知'),
+                ),
+                h(
+                  'div',
+                  { className: 'dsh-3b-stat-cell' },
+                  h('span', { className: 'dsh-3b-stat-label' }, '最近成功导入'),
+                  h('span', { className: 'dsh-3b-stat-value' }, folder.last_success ? new Date(folder.last_success).toLocaleString('zh-CN') : '—'),
+                ),
+                h(
+                  'div',
+                  { className: 'dsh-3b-stat-cell' },
+                  h('span', { className: 'dsh-3b-stat-label' }, '待处理文件'),
+                  h('span', { className: 'dsh-3b-stat-value' }, `${folder.pending || 0} 份`),
+                ),
+                h(
+                  'div',
+                  { className: 'dsh-3b-stat-cell' },
+                  h('span', { className: 'dsh-3b-stat-label' }, '导入异常'),
+                  h('span', { className: 'dsh-3b-stat-value' }, `${folder.errors || 0} 份`),
+                ),
               ),
-              h('p', { style: { margin: '4px 0', fontSize: '13px', fontWeight: 500 } }, folder.message || '等待新导出文件'),
+              h(
+                'p',
+                { className: 'dsh-3b-status-line' },
+                h('span', {
+                  className: 'dsh-3b-dot' + (Number(folder.errors) > 0 || folder.snapshot_error ? ' warn' : ''),
+                  'aria-hidden': 'true',
+                }),
+                folder.message || '等待新导出文件',
+              ),
               folder.phase !== 'checking' && h(
                 'p',
                 { className: 'dsh-3b-metric-note' },
-                `最近一次扫描新增 ${folder.added || 0} 条数据点；待处理文件 ${folder.pending || 0} 份；导入异常 ${folder.errors || 0} 份。`,
+                `最近一次扫描新增 ${folder.added || 0} 条数据点。`,
               ),
               Array.isArray(folder.problems) && folder.problems.length > 0 && h(
                 'div',
-                { style: { marginTop: '8px' } },
+                null,
                 folder.problems.map((p, idx) =>
                   h(
                     'p',
-                    { key: idx, className: 'dsh-3b-metric-note', style: { color: '#fbbf24' } },
+                    { key: idx, className: 'dsh-3b-problem' },
+                    h('span', { className: 'dsh-3b-dot warn', 'aria-hidden': 'true' }),
                     `文件 ${p.file}：${SYNC_PROBLEM_LABELS[p.kind] || '读取异常'}${p.detail ? `（${p.detail}）` : ''}`,
                   ),
                 ),
@@ -1181,23 +2297,18 @@ window.__ModuleLoader__.load({
             : h('p', { className: 'dsh-3b-metric-note' }, '尚无 DataCenter 同步状态记录，请先确认 local.datacenter.health 任务正在运行。'),
           store && h(
             'p',
-            { className: 'dsh-3b-metric-note' },
+            { className: 'dsh-3b-path' },
             `数据目录：${store.dir || '未解析'}${store.source === 'datacenter' ? '（DataCenter）' : ''}${store.usable === false ? ` · 不可用：${store.reason || '未知原因'}` : ''}`,
-          ),
-          folder?.last_success && h(
-            'p',
-            { className: 'dsh-3b-metric-note' },
-            `最近成功导入：${new Date(folder.last_success).toLocaleString('zh-CN')}`,
           ),
           h(
             'p',
-            { className: 'dsh-3b-metric-note', style: { marginTop: '6px' } },
+            { className: 'dsh-3b-metric-note' },
             '手机通过 Health Auto Export 导出到 iCloud；导入与摘要由 DataCenter 的 local.datacenter.health 任务每 5 分钟执行。本插件只读取状态，不写入其状态文件。',
           ),
         ),
         h(
           'div',
-          { className: 'dsh-3b-metrics-grid' },
+          { className: 'dsh-3b-stat-grid' },
           h(
             'section',
             { className: 'dsh-3b-card' },
@@ -1209,7 +2320,7 @@ window.__ModuleLoader__.load({
             ),
             h(
               'div',
-              { className: 'dsh-3b-metric-val mint' },
+              { className: 'dsh-3b-metric-val' },
               h('strong', null, formatNum(fileImport?.records || 0, 0)),
               h('span', null, '条去重数据点'),
             ),
@@ -1231,11 +2342,11 @@ window.__ModuleLoader__.load({
               'div',
               { className: 'dsh-3b-section-head' },
               h('h2', null, 'Apple Health 历史主库 (life.sqlite3)'),
-              h('span', { className: 'dsh-3b-badge blue' }, 'ZIP 全量去重'),
+              h('span', { className: 'dsh-3b-badge accent' }, 'ZIP 全量去重'),
             ),
             h(
               'div',
-              { className: 'dsh-3b-metric-val blue' },
+              { className: 'dsh-3b-metric-val' },
               h('strong', null, formatNum(zipImport?.records || 0, 0)),
               h('span', null, '条健康事件'),
             ),
@@ -1347,8 +2458,8 @@ window.__ModuleLoader__.load({
 
       return h(
         'div',
-        { style: { display: 'flex', flexDirection: 'column', gap: '18px' } },
-        err && h('div', { className: 'dsh-3b-notice' }, err),
+        { className: 'dsh-3b-tab-body' },
+        err && h('div', { className: 'dsh-3b-notice error' }, err),
         msg && h('div', { className: 'dsh-3b-success' }, msg),
         h(
           'section',
@@ -1362,7 +2473,7 @@ window.__ModuleLoader__.load({
               h('h2', null, '在 DSH 中直接发起 AI 健康分析'),
               h(
                 'p',
-                { className: 'dsh-3b-subtitle', style: { marginTop: '4px' } },
+                { className: 'dsh-3b-subtitle' },
                 '无需外接 Codex CLI：直接在 ~/Library/Application Support/ThreeBody/AgentAnalysis 下生成脱敏摘要包，并一键跳回 DSH 主对话窗口填入分析提示词。',
               ),
             ),
@@ -1370,11 +2481,11 @@ window.__ModuleLoader__.load({
           ),
           h(
             'div',
-            { style: { display: 'flex', flexWrap: 'wrap', gap: '14px', marginTop: '6px' } },
+            { className: 'dsh-3b-field-row' },
             h(
               'label',
-              { style: { fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px' } },
-              '分析范围：',
+              { className: 'dsh-3b-field' },
+              h('span', { className: 'dsh-3b-field-label' }, '分析范围：'),
               h(
                 'select',
                 {
@@ -1388,8 +2499,8 @@ window.__ModuleLoader__.load({
             ),
             domain === 'health_period' && h(
               'label',
-              { style: { fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px' } },
-              '统计窗口：',
+              { className: 'dsh-3b-field' },
+              h('span', { className: 'dsh-3b-field-label' }, '统计窗口：'),
               h(
                 'select',
                 {
@@ -1402,7 +2513,7 @@ window.__ModuleLoader__.load({
             ),
             h(
               'label',
-              { style: { fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' } },
+              { className: 'dsh-3b-field' },
               h('input', {
                 type: 'checkbox',
                 checked: includeCheckins,
@@ -1413,18 +2524,11 @@ window.__ModuleLoader__.load({
           ),
           domain === 'health_period' && catalog.length > 0 && h(
             'div',
-            {
-              style: {
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: '8px',
-                marginTop: '6px',
-              },
-            },
+            { className: 'dsh-3b-ai-metrics' },
             Array.from({ length: 6 }, (_, idx) =>
               h(
                 'label',
-                { key: idx, style: { fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '4px' } },
+                { key: idx, className: 'dsh-3b-field-stack' },
                 `分析指标 ${idx + 1}`,
                 h(
                   'select',
@@ -1441,11 +2545,11 @@ window.__ModuleLoader__.load({
           ),
           h(
             'div',
-            { style: { marginTop: '6px' } },
+            null,
             h(
               'div',
-              { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' } },
-              h('span', { style: { fontSize: '12.5px', fontWeight: 500 } }, '希望 DSH Agent 重点分析什么：'),
+              { className: 'dsh-3b-goal-head' },
+              h('span', { className: 'dsh-3b-field-text' }, '希望 DSH Agent 重点分析什么：'),
               h(
                 'div',
                 { className: 'dsh-3b-tag-list' },
@@ -1472,7 +2576,7 @@ window.__ModuleLoader__.load({
           ),
           h(
             'div',
-            { className: 'dsh-3b-actions', style: { marginTop: '4px' } },
+            { className: 'dsh-3b-actions' },
             h(
               'button',
               {
@@ -1503,7 +2607,7 @@ window.__ModuleLoader__.load({
             { className: 'dsh-3b-section-head' },
             h(
               'div',
-              { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+              { className: 'dsh-3b-title-row' },
               h('h2', null, `任务已就绪：${activeJob.job_id}`),
               h('span', { className: 'dsh-3b-badge' }, activeJob.source_label || '通过 dsh 3B健康插件写入'),
             ),
@@ -1541,21 +2645,21 @@ window.__ModuleLoader__.load({
           ),
           h(
             'p',
-            { className: 'dsh-3b-metric-note' },
+            { className: 'dsh-3b-path' },
             `任务工作区路径：${activeJob.workspace_path} · 生成时间：${String(activeJob.created_at || '').replace('T', ' ').slice(0, 19)}`,
           ),
           activeJob.report && h(
             'div',
-            { style: { marginTop: '8px' } },
-            h('h3', { style: { fontSize: '13.5px', margin: '0 0 6px', color: '#10b981' } }, 'DSH Agent 已生成的健康分析报告 (outputs/report.md)：'),
+            { className: 'dsh-3b-report' },
+            h('h3', null, 'DSH Agent 已生成的健康分析报告 (outputs/report.md)：'),
             h('pre', { className: 'dsh-3b-pre' }, activeJob.report),
           ),
           h(
             'details',
-            { style: { marginTop: '6px' } },
-            h('summary', { style: { cursor: 'pointer', fontSize: '12.5px', color: 'var(--dsw-alias-text-secondary, #9ca3af)' } }, '查看任务说明 (context.md) 与脱敏数据摘要 (summary.json)'),
-            h('pre', { className: 'dsh-3b-pre', style: { marginTop: '8px' } }, activeJob.context || ''),
-            activeJob.summary && h('pre', { className: 'dsh-3b-pre', style: { marginTop: '8px' } }, JSON.stringify(activeJob.summary, null, 2)),
+            { className: 'dsh-3b-details' },
+            h('summary', null, '查看任务说明 (context.md) 与脱敏数据摘要 (summary.json)'),
+            h('pre', { className: 'dsh-3b-pre' }, activeJob.context || ''),
+            activeJob.summary && h('pre', { className: 'dsh-3b-pre' }, JSON.stringify(activeJob.summary, null, 2)),
           ),
         ),
         h(
@@ -1568,7 +2672,7 @@ window.__ModuleLoader__.load({
             h('button', { className: 'dsh-3b-btn', onClick: loadInit }, '刷新列表'),
           ),
           !initData?.jobs?.length
-            ? h('p', { className: 'dsh-3b-metric-note' }, '尚无历史健康分析任务，可在上方一键创建。')
+            ? h('p', { className: 'dsh-3b-empty' }, '尚无历史健康分析任务，可在上方一键创建。')
             : h(
               'div',
               { className: 'dsh-3b-table-wrap' },
@@ -1581,11 +2685,11 @@ window.__ModuleLoader__.load({
                   h(
                     'tr',
                     null,
-                    h('th', null, '任务编号'),
-                    h('th', null, '类型'),
-                    h('th', null, '创建时间'),
-                    h('th', null, '报告状态'),
-                    h('th', null, '操作'),
+                    h('th', { scope: 'col' }, '任务编号'),
+                    h('th', { scope: 'col' }, '类型'),
+                    h('th', { scope: 'col' }, '创建时间'),
+                    h('th', { scope: 'col' }, '报告状态'),
+                    h('th', { scope: 'col' }, '操作'),
                   ),
                 ),
                 h(
@@ -1603,13 +2707,13 @@ window.__ModuleLoader__.load({
                           ? `阶段总结 (${item.health_options?.days || 30}天)`
                           : '七日汇总',
                       ),
-                      h('td', null, String(item.created_at || '').replace('T', ' ').slice(0, 19)),
+                      h('td', { className: 'dsh-3b-nowrap' }, String(item.created_at || '').replace('T', ' ').slice(0, 19)),
                       h(
                         'td',
                         null,
                         item.has_report
-                          ? h('span', { className: 'dsh-3b-badge' }, '已生成报告')
-                          : h('span', { className: 'dsh-3b-badge amber' }, '待分析'),
+                          ? h('span', { className: 'dsh-3b-badge success' }, '已生成报告')
+                          : h('span', { className: 'dsh-3b-badge warn' }, '待分析'),
                       ),
                       h(
                         'td',
@@ -1621,8 +2725,7 @@ window.__ModuleLoader__.load({
                             'button',
                             {
                               type: 'button',
-                              className: 'dsh-3b-btn',
-                              style: { padding: '3px 9px', fontSize: '11.5px' },
+                              className: 'dsh-3b-btn tiny',
                               onClick: () => handleOpenHistoryJob(item.job_id),
                             },
                             '查看详情/报告',
@@ -1792,8 +2895,8 @@ window.__ModuleLoader__.load({
                 { className: 'dsh-3b-brand-row' },
                 h('h1', { className: 'dsh-3b-title' }, '3B健康'),
                 h('span', { className: 'dsh-3b-badge' }, '通过 dsh 3B健康插件写入'),
-                store && !store.usable && h('span', { className: 'dsh-3b-badge amber' }, '数据目录不可用'),
-                diagnostics?.summary_outdated && h('span', { className: 'dsh-3b-badge amber' }, '有新导出未汇总'),
+                store && !store.usable && h('span', { className: 'dsh-3b-badge warn' }, '数据目录不可用'),
+                diagnostics?.summary_outdated && h('span', { className: 'dsh-3b-badge warn' }, '有新导出未汇总'),
               ),
               h(
                 'p',
@@ -1802,27 +2905,32 @@ window.__ModuleLoader__.load({
               ),
               h(
                 'p',
-                { className: 'dsh-3b-metric-note', style: { marginTop: '2px' } },
+                { className: 'dsh-3b-path' },
                 `数据目录：${store?.dir || '未解析'}${store?.source === 'datacenter' ? '（DataCenter）' : ''}${Number(diagnostics?.data_lag_days) > 0 ? ` · 距今 ${diagnostics.data_lag_days} 天` : ''}`,
               ),
             ),
             h(
-              'nav',
-              { className: 'dsh-3b-nav', 'aria-label': '3B健康板块切换' },
-              [
-                ['dashboard', '健康仪表盘'],
-                ['sync', '手机同步'],
-                ['ai', 'AI 健康分析'],
-              ].map(([key, label]) =>
-                h(
-                  'button',
-                  {
-                    key,
-                    type: 'button',
-                    className: 'dsh-3b-tab' + (activeTab === key ? ' active' : ''),
-                    onClick: () => setActiveTab(key),
-                  },
-                  label,
+              'div',
+              { className: 'dsh-3b-tab-row' },
+              h(
+                'nav',
+                { className: 'dsh-3b-nav', 'aria-label': '3B健康板块切换' },
+                [
+                  ['dashboard', '健康仪表盘'],
+                  ['sync', '手机同步'],
+                  ['ai', 'AI 健康分析'],
+                ].map(([key, label]) =>
+                  h(
+                    'button',
+                    {
+                      key,
+                      type: 'button',
+                      className: 'dsh-3b-tab' + (activeTab === key ? ' active' : ''),
+                      'aria-current': activeTab === key ? 'page' : undefined,
+                      onClick: () => setActiveTab(key),
+                    },
+                    label,
+                  ),
                 ),
               ),
             ),
@@ -1833,7 +2941,7 @@ window.__ModuleLoader__.load({
                 'button',
                 {
                   type: 'button',
-                  className: 'dsh-3b-btn mint',
+                  className: 'dsh-3b-btn primary',
                   onClick: () => setCheckinModalCat('diet'),
                 },
                 '+ 饮食/精力打卡',
@@ -1851,7 +2959,8 @@ window.__ModuleLoader__.load({
                 'button',
                 {
                   type: 'button',
-                  className: 'dsh-3b-btn',
+                  className: 'dsh-3b-btn ghost',
+                  'aria-pressed': privacy,
                   onClick: () => setPrivacy(p => !p),
                 },
                 privacy ? '恢复展示' : '隐私遮蔽',
@@ -1860,7 +2969,7 @@ window.__ModuleLoader__.load({
                 'button',
                 {
                   type: 'button',
-                  className: 'dsh-3b-btn',
+                  className: 'dsh-3b-btn ghost',
                   disabled: loading,
                   onClick: () => loadDashboard(),
                 },
@@ -1870,7 +2979,7 @@ window.__ModuleLoader__.load({
           ),
 
           toastMsg && h('div', { className: 'dsh-3b-success' }, toastMsg),
-          err && h('div', { className: 'dsh-3b-notice' }, err),
+          err && h('div', { className: 'dsh-3b-notice error' }, err),
           store && !store.usable && h(
             'div',
             { className: 'dsh-3b-notice' },
@@ -1890,8 +2999,8 @@ window.__ModuleLoader__.load({
           privacy
             ? h(
               'section',
-              { className: 'dsh-3b-card', style: { padding: '48px 24px', textAlign: 'center', alignItems: 'center' } },
-              h('h2', { style: { margin: '0 0 8px' } }, '个人健康数据已隐藏'),
+              { className: 'dsh-3b-card dsh-3b-privacy' },
+              h('h2', null, '个人健康数据已隐藏'),
               h('p', { className: 'dsh-3b-metric-note' }, '当前处于隐私遮蔽模式，点击右上角「恢复展示」继续查看。'),
             )
             : activeTab === 'sync'
@@ -1907,11 +3016,11 @@ window.__ModuleLoader__.load({
                   null,
                   syncIssue && h(
                     'div',
-                    { className: 'dsh-3b-notice', style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' } },
+                    { className: 'dsh-3b-notice row' },
                     h('span', null, `同步状态提醒：${syncIssue}`),
                     h(
                       'button',
-                      { type: 'button', className: 'dsh-3b-btn', onClick: () => setActiveTab('sync') },
+                      { type: 'button', className: 'dsh-3b-btn ghost', onClick: () => setActiveTab('sync') },
                       '查看手机同步 →',
                     ),
                   ),
@@ -1919,109 +3028,120 @@ window.__ModuleLoader__.load({
                   /* Top 4 Summary Cards */
                   h(
                     'section',
-                    { className: 'dsh-3b-metrics-grid', 'aria-label': '核心健康指标与日常打卡' },
+                    { className: 'dsh-3b-section', 'aria-label': '核心健康指标与日常打卡' },
                     h(
                       'div',
-                      { className: 'dsh-3b-card' },
-                      h('div', { className: 'dsh-3b-metric-head' }, h('span', null, '7日运动汇总'), h('span', { className: 'dsh-3b-badge' }, '自动统计')),
+                      { className: 'dsh-3b-section-head' },
                       h(
                         'div',
-                        { className: 'dsh-3b-metric-val mint' },
-                        h('strong', null, formatNum(health?.exercise_total, 1)),
-                        h('span', null, '分钟'),
-                      ),
-                      h(
-                        'p',
-                        { className: 'dsh-3b-metric-note' },
-                        `${health?.exercise_days ?? 0}/7 天有${health?.data_source === 'health-export' ? '训练明细' : '活动汇总'} · 窗口含最新资料日`,
+                        null,
+                        h('h2', null, h('span', { className: 'dsh-3b-section-index', 'aria-hidden': 'true' }, '01'), '核心指标'),
                       ),
                     ),
                     h(
                       'div',
-                      { className: 'dsh-3b-card' },
-                      h('div', { className: 'dsh-3b-metric-head' }, h('span', null, '可用睡眠平均时长'), h('span', { className: 'dsh-3b-badge blue' }, '自动统计')),
+                      { className: 'dsh-3b-metrics-grid' },
                       h(
                         'div',
-                        { className: 'dsh-3b-metric-val blue' },
-                        h('strong', null, formatNum(health?.sleep_average, 2)),
-                        h('span', null, '小时'),
-                      ),
-                      h(
-                        'p',
-                        { className: 'dsh-3b-metric-note' },
-                        `${health?.sleep_days ?? 0}/7 个统计日有入睡记录 · 前日中午至当日中午归并`,
-                      ),
-                    ),
-                    h(
-                      'div',
-                      {
-                        className: 'dsh-3b-card interactive',
-                        onClick: () => setCheckinModalCat('diet'),
-                        role: 'button',
-                        tabIndex: 0,
-                      },
-                      h(
-                        'div',
-                        { className: 'dsh-3b-metric-head' },
-                        h('span', null, '饮食记录（点击录入）'),
-                        h('span', { className: 'dsh-3b-badge amber' }, '可交互 · 留痕'),
-                      ),
-                      h(
-                        'div',
-                        { className: 'dsh-3b-metric-val amber' },
+                        { className: 'dsh-3b-card dsh-3b-kpi' },
+                        h('div', { className: 'dsh-3b-metric-head' }, h('span', null, '7日运动汇总'), h('span', { className: 'dsh-3b-badge' }, '自动统计')),
                         h(
-                          'strong',
-                          null,
-                          dietSummary?.today_count > 0
-                            ? `今日 ${dietSummary.today_count} 餐`
-                            : dietSummary?.avg_score_7d != null
-                              ? `${dietSummary.avg_score_7d} 分`
-                              : '点击记录',
+                          'div',
+                          { className: 'dsh-3b-metric-val' },
+                          h('strong', null, formatNum(health?.exercise_total, 1)),
+                          h('span', null, '分钟'),
                         ),
-                        h('span', null, dietSummary?.today_count > 0 && dietSummary?.avg_score_7d != null ? `· 近7日均分 ${dietSummary.avg_score_7d}/5` : ''),
-                      ),
-                      h(
-                        'p',
-                        { className: 'dsh-3b-metric-note' },
-                        dietSummary?.latest
-                          ? `最近：${dietSummary.latest.record_date} ${dietSummary.latest.meal_type || ''} ${dietSummary.latest.tags?.length ? `[${dietSummary.latest.tags.join(',')}]` : ''} ${dietSummary.latest.note || ''}`
-                          : '点击录入早/中/晚/加餐、健康度评分与饮食标签',
-                      ),
-                    ),
-                    h(
-                      'div',
-                      {
-                        className: 'dsh-3b-card interactive',
-                        onClick: () => setCheckinModalCat('energy'),
-                        role: 'button',
-                        tabIndex: 0,
-                      },
-                      h(
-                        'div',
-                        { className: 'dsh-3b-metric-head' },
-                        h('span', null, '精力自评（点击录入）'),
-                        h('span', { className: 'dsh-3b-badge blue' }, '可交互 · 留痕'),
-                      ),
-                      h(
-                        'div',
-                        { className: 'dsh-3b-metric-val purple' },
                         h(
-                          'strong',
-                          null,
-                          energySummary?.today_latest?.score != null
-                            ? `${energySummary.today_latest.score} / 10`
-                            : energySummary?.avg_score_7d != null
-                              ? `均值 ${energySummary.avg_score_7d}`
-                              : '点击自评',
+                          'p',
+                          { className: 'dsh-3b-metric-note' },
+                          `${health?.exercise_days ?? 0}/7 天有${health?.data_source === 'health-export' ? '训练明细' : '活动汇总'} · 窗口含最新资料日`,
                         ),
-                        h('span', null, energySummary?.days_7d ? `近7日已记 ${energySummary.days_7d} 天` : '1～10 分体感自评'),
                       ),
                       h(
-                        'p',
-                        { className: 'dsh-3b-metric-note' },
-                        energySummary?.latest
-                          ? `最近：${energySummary.latest.record_date} (${energySummary.latest.score ?? '—'}分) ${energySummary.latest.tags?.length ? `[${energySummary.latest.tags.join(',')}]` : ''} ${energySummary.latest.note || ''}`
-                          : '需要本人记录体感与专注度，不从穿戴设备推算',
+                        'div',
+                        { className: 'dsh-3b-card dsh-3b-kpi' },
+                        h('div', { className: 'dsh-3b-metric-head' }, h('span', null, '可用睡眠平均时长'), h('span', { className: 'dsh-3b-badge' }, '自动统计')),
+                        h(
+                          'div',
+                          { className: 'dsh-3b-metric-val' },
+                          h('strong', null, formatNum(health?.sleep_average, 2)),
+                          h('span', null, '小时'),
+                        ),
+                        h(
+                          'p',
+                          { className: 'dsh-3b-metric-note' },
+                          `${health?.sleep_days ?? 0}/7 个统计日有入睡记录 · 前日中午至当日中午归并`,
+                        ),
+                      ),
+                      h(
+                        'button',
+                        {
+                          type: 'button',
+                          className: 'dsh-3b-card dsh-3b-kpi interactive',
+                          onClick: () => setCheckinModalCat('diet'),
+                        },
+                        h(
+                          'div',
+                          { className: 'dsh-3b-metric-head' },
+                          h('span', null, '饮食记录（点击录入）'),
+                          h('span', { className: 'dsh-3b-badge accent' }, '可交互 · 留痕'),
+                        ),
+                        h(
+                          'div',
+                          { className: 'dsh-3b-metric-val' },
+                          h(
+                            'strong',
+                            null,
+                            dietSummary?.today_count > 0
+                              ? `今日 ${dietSummary.today_count} 餐`
+                              : dietSummary?.avg_score_7d != null
+                                ? `${dietSummary.avg_score_7d} 分`
+                                : '点击记录',
+                          ),
+                          h('span', null, dietSummary?.today_count > 0 && dietSummary?.avg_score_7d != null ? `· 近7日均分 ${dietSummary.avg_score_7d}/5` : ''),
+                        ),
+                        h(
+                          'p',
+                          { className: 'dsh-3b-metric-note' },
+                          dietSummary?.latest
+                            ? `最近：${dietSummary.latest.record_date} ${dietSummary.latest.meal_type || ''} ${dietSummary.latest.tags?.length ? `[${dietSummary.latest.tags.join(',')}]` : ''} ${dietSummary.latest.note || ''}`
+                            : '点击录入早/中/晚/加餐、健康度评分与饮食标签',
+                        ),
+                      ),
+                      h(
+                        'button',
+                        {
+                          type: 'button',
+                          className: 'dsh-3b-card dsh-3b-kpi interactive',
+                          onClick: () => setCheckinModalCat('energy'),
+                        },
+                        h(
+                          'div',
+                          { className: 'dsh-3b-metric-head' },
+                          h('span', null, '精力自评（点击录入）'),
+                          h('span', { className: 'dsh-3b-badge accent' }, '可交互 · 留痕'),
+                        ),
+                        h(
+                          'div',
+                          { className: 'dsh-3b-metric-val' },
+                          h(
+                            'strong',
+                            null,
+                            energySummary?.today_latest?.score != null
+                              ? `${energySummary.today_latest.score} / 10`
+                              : energySummary?.avg_score_7d != null
+                                ? `均值 ${energySummary.avg_score_7d}`
+                                : '点击自评',
+                          ),
+                          h('span', null, energySummary?.days_7d ? `近7日已记 ${energySummary.days_7d} 天` : '1～10 分体感自评'),
+                        ),
+                        h(
+                          'p',
+                          { className: 'dsh-3b-metric-note' },
+                          energySummary?.latest
+                            ? `最近：${energySummary.latest.record_date} (${energySummary.latest.score ?? '—'}分) ${energySummary.latest.tags?.length ? `[${energySummary.latest.tags.join(',')}]` : ''} ${energySummary.latest.note || ''}`
+                            : '需要本人记录体感与专注度，不从穿戴设备推算',
+                        ),
                       ),
                     ),
                   ),
@@ -2029,14 +3149,14 @@ window.__ModuleLoader__.load({
                   /* 6 Independent Trend Charts */
                   h(
                     'section',
-                    { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
+                    { className: 'dsh-3b-section' },
                     h(
                       'div',
                       { className: 'dsh-3b-section-head' },
                       h(
                         'div',
                         null,
-                        h('h2', null, '六组独立健康趋势（43 项指标 × 30/90/365 天）'),
+                        h('h2', null, h('span', { className: 'dsh-3b-section-index', 'aria-hidden': 'true' }, '02'), '六组独立健康趋势（43 项指标 × 30/90/365 天）'),
                         h(
                           'p',
                           { className: 'dsh-3b-subtitle' },
@@ -2072,7 +3192,7 @@ window.__ModuleLoader__.load({
                       h(
                         'div',
                         null,
-                        h('h2', null, '健康阶段总结'),
+                        h('h2', null, h('span', { className: 'dsh-3b-section-index', 'aria-hidden': 'true' }, '03'), '健康阶段总结'),
                         h('p', { className: 'dsh-3b-subtitle' }, '跟随上方六图所选指标，按统一时间段核对有效日均值、覆盖天数与首末变化。'),
                       ),
                       h(
@@ -2080,8 +3200,8 @@ window.__ModuleLoader__.load({
                         { className: 'dsh-3b-actions' },
                         h(
                           'label',
-                          { style: { fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px' } },
-                          '总结周期：',
+                          { className: 'dsh-3b-field' },
+                          h('span', { className: 'dsh-3b-field-label' }, '总结周期：'),
                           h(
                             'select',
                             {
@@ -2113,9 +3233,21 @@ window.__ModuleLoader__.load({
                           h('h4', null, healthTrendLabel(row.metric)),
                           h(
                             'div',
-                            { style: { fontSize: '18px', fontWeight: 700, color: '#60a5fa' } },
-                            `${formatNum(row.mean, 2)} `,
-                            h('span', { style: { fontSize: '12px', fontWeight: 400, color: 'var(--dsw-alias-text-secondary, #9ca3af)' } }, `${row.metric.unit || ''} · 有效日均值`),
+                            { className: 'dsh-3b-stat-value' },
+                            formatNum(row.mean, 2),
+                            h('span', { className: 'unit' }, `${row.metric.unit || ''} · 有效日均值`),
+                          ),
+                          h(
+                            'div',
+                            { className: 'dsh-3b-meter', 'aria-hidden': 'true' },
+                            h(
+                              'span',
+                              { className: 'dsh-3b-meter-track' },
+                              h('span', {
+                                className: 'dsh-3b-meter-fill',
+                                style: { width: `${Math.round((row.recorded / Math.max(1, stageDays)) * 100)}%` },
+                              }),
+                            ),
                           ),
                           h('p', { className: 'dsh-3b-metric-note' }, `有记录 ${row.recorded} / ${stageDays} 天 · 缺失 ${row.missing} 天`),
                           row.first
@@ -2140,7 +3272,7 @@ window.__ModuleLoader__.load({
                       h(
                         'div',
                         null,
-                        h('h2', null, '训练记录 · 近 7 日'),
+                        h('h2', null, h('span', { className: 'dsh-3b-section-index', 'aria-hidden': 'true' }, '04'), '训练记录 · 近 7 日'),
                         h(
                           'p',
                           { className: 'dsh-3b-subtitle' },
@@ -2149,36 +3281,36 @@ window.__ModuleLoader__.load({
                             : (workouts?.note || '尚未导入运动记录'),
                         ),
                       ),
-                      workouts?.available && h('span', { className: 'dsh-3b-badge mint' }, `近7日 ${workouts.count || 0} 次训练`),
+                      workouts?.available && h('span', { className: 'dsh-3b-badge success' }, `近7日 ${workouts.count || 0} 次训练`),
                     ),
                     workouts?.available && h(
                       React.Fragment,
                       null,
                       h(
                         'div',
-                        { className: 'dsh-3b-metrics-grid' },
+                        { className: 'dsh-3b-stat-grid' },
                         h(
                           'div',
                           { className: 'dsh-3b-period-item' },
                           h('span', { className: 'dsh-3b-metric-note' }, '近 7 日训练次数'),
-                          h('strong', { style: { fontSize: '20px' } }, `${workouts.count || 0} 次`),
+                          h('strong', { className: 'dsh-3b-stat-value' }, `${workouts.count || 0} 次`),
                         ),
                         h(
                           'div',
                           { className: 'dsh-3b-period-item' },
                           h('span', { className: 'dsh-3b-metric-note' }, '训练总时长'),
-                          h('strong', { style: { fontSize: '20px' } }, `${formatNum(workouts.total_minutes, 1)} 分钟`),
+                          h('strong', { className: 'dsh-3b-stat-value' }, `${formatNum(workouts.total_minutes, 1)} 分钟`),
                         ),
                         h(
                           'div',
                           { className: 'dsh-3b-period-item' },
                           h('span', { className: 'dsh-3b-metric-note' }, '训练总消耗'),
-                          h('strong', { style: { fontSize: '20px' } }, `${formatNum(workouts.total_energy_kcal, 1)} kcal`),
+                          h('strong', { className: 'dsh-3b-stat-value' }, `${formatNum(workouts.total_energy_kcal, 1)} kcal`),
                         ),
                       ),
                       Array.isArray(workouts.recent) && workouts.recent.length > 0 && h(
                         'div',
-                        { className: 'dsh-3b-table-wrap', style: { marginTop: '8px' } },
+                        { className: 'dsh-3b-table-wrap' },
                         h(
                           'table',
                           { className: 'dsh-3b-table' },
@@ -2188,11 +3320,11 @@ window.__ModuleLoader__.load({
                             h(
                               'tr',
                               null,
-                              h('th', null, '日期'),
-                              h('th', null, '运动类型'),
-                              h('th', null, '时长（分钟）'),
-                              h('th', null, '消耗（kcal）'),
-                              h('th', null, '距离'),
+                              h('th', { scope: 'col' }, '日期'),
+                              h('th', { scope: 'col' }, '运动类型'),
+                              h('th', { scope: 'col', className: 'dsh-3b-num' }, '时长（分钟）'),
+                              h('th', { scope: 'col', className: 'dsh-3b-num' }, '消耗（kcal）'),
+                              h('th', { scope: 'col', className: 'dsh-3b-num' }, '距离'),
                             ),
                           ),
                           h(
@@ -2202,11 +3334,11 @@ window.__ModuleLoader__.load({
                               h(
                                 'tr',
                                 { key: idx },
-                                h('td', null, w.date),
+                                h('td', { className: 'dsh-3b-nowrap' }, w.date),
                                 h('td', null, w.activity),
-                                h('td', null, formatNum(w.minutes, 1)),
-                                h('td', null, formatNum(w.energy_kcal, 1)),
-                                h('td', null, w.distance == null ? '—' : `${formatNum(w.distance, 2)} ${w.distance_unit || ''}`),
+                                h('td', { className: 'dsh-3b-num' }, formatNum(w.minutes, 1)),
+                                h('td', { className: 'dsh-3b-num' }, formatNum(w.energy_kcal, 1)),
+                                h('td', { className: 'dsh-3b-num' }, w.distance == null ? '—' : `${formatNum(w.distance, 2)} ${w.distance_unit || ''}`),
                               ),
                             ),
                           ),
@@ -2219,16 +3351,20 @@ window.__ModuleLoader__.load({
                   health && h(
                     'details',
                     { className: 'dsh-3b-card' },
-                    h('summary', { style: { cursor: 'pointer', fontSize: '13px', fontWeight: 500 } }, '查看数据覆盖范围与统计口径说明'),
-                    Array.isArray(health.coverage) && h(
-                      'p',
-                      { className: 'dsh-3b-metric-note', style: { marginTop: '8px' } },
-                      `历史覆盖范围：${health.coverage[0]} 至 ${health.coverage[1]} · SQL 主库去重记录 ${formatNum(health.coverage[2], 0)} 条 · 最近导入时间：${health.imported_at || '—'} · 快照生成时间：${health.generated_at || '—'}`,
-                    ),
-                    Array.isArray(health.methods) && h(
-                      'ul',
-                      { style: { margin: '6px 0 0', paddingLeft: '18px', fontSize: '12px', color: 'var(--dsw-alias-text-tertiary, #8b92a5)', lineHeight: 1.6 } },
-                      health.methods.map((m, i) => h('li', { key: i }, m)),
+                    h('summary', null, '查看数据覆盖范围与统计口径说明'),
+                    h(
+                      'div',
+                      { className: 'dsh-3b-details-body' },
+                      Array.isArray(health.coverage) && h(
+                        'p',
+                        { className: 'dsh-3b-metric-note' },
+                        `历史覆盖范围：${health.coverage[0]} 至 ${health.coverage[1]} · SQL 主库去重记录 ${formatNum(health.coverage[2], 0)} 条 · 最近导入时间：${health.imported_at || '—'} · 快照生成时间：${health.generated_at || '—'}`,
+                      ),
+                      Array.isArray(health.methods) && h(
+                        'ul',
+                        { className: 'dsh-3b-details-list' },
+                        health.methods.map((m, i) => h('li', { key: i }, m)),
+                      ),
                     ),
                   ),
                 ),

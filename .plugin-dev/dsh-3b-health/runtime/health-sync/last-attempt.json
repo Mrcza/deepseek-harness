@@ -1,0 +1,1 @@
+{"time": "2026-10-15T22:32:39.746088+00:00", "status": 400, "message": "未收到任何健康样本：可能未授权、未解锁或所选日期没有记录，不按零记录处理", "shape": {"steps_ndjson": {"type": "str", "length": 0}, "exercise_ndjson": {"type": "str", "length": 0}, "sleep_ndjson": {"type": "str", "length": 0}}}

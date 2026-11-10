@@ -1,0 +1,12 @@
+{
+  "state": "complete",
+  "finished_at": "2026-11-07T11:48:59.259296+00:00",
+  "folder": "/Volumes/My Passport/生活助手备份/backup-20261107T112051Z-4a8a247d",
+  "bytes": 7076100360,
+  "files": 266,
+  "message": "备份完成，数据库与文件校验通过",
+  "warnings": [],
+  "run_id": "852cda98fe6d4624902ab1bbd131c0b0",
+  "started_at": "2026-11-07T11:20:51.150097+00:00",
+  "history_issue_code": null
+}

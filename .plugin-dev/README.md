@@ -44,7 +44,7 @@
 * **不占用已有端口**：插件通过 DSH 内置的 `ctx.connection.fetch` 注册 `/api/3b-health/*` 路由，不绑定 `4312` 或 `4313` 端口，与原网页端常驻进程互不干扰。
 * **数据库读写安全**：高频查询（仪表盘、同步状态、历史任务）全部采用 SQLite 只读连接（`readOnly: true`）或直接读取原子快照文件 `health-summary.json`。
 * **活动数据目录**：`resolveStore()` 依次使用 `THREEBODY_DATA_ROOT`、DataCenter `center.json` 的 `root/data`、旧 codex 目录（仅未停写时）。2026-11-08 11:03 起活动库为 `/Volumes/DataDisk/DataCenter/data`；旧目录带 `.datacenter-retired` 标记，插件只在其上做一次性只读迁移，不再写入。
-* **快照新鲜度与性能**：仪表盘只读 `health-export-sync.json`、`health-summary.json` 和插件小表，按状态文件的 `pending`/`snapshot_pending`/`snapshot_error` 及 `last_success` 与快照生成时间判断「有新导出未汇总」；同步页只读取 DataCenter 的 `health-export-sync.json`，**不写该状态文件**。导入统计来自 `files`/`workouts`/`imports` 小表（ZIP 事件数取 `imports.added` 累计），不扫描 2.69GB 的 `health_events`；统计缓存 60 秒，客户端另有 120 秒仪表盘缓存。
+* **快照新鲜度与性能**：仪表盘只读 `health-export-sync.json`、`health-summary.json` 和插件小表，按状态文件的 `pending`/`snapshot_pending`/`snapshot_error` 及 `last_success` 与快照生成时间判断「有新导出未汇总」；同步页只读取 DataCenter 的 `health-export-sync.json`，**不写该状态文件**。导入统计来自 `files`/`workouts`/`imports` 小表（ZIP 事件数取 `imports.added` 累计），不扫描 2.69GB 的 `health_events`；导出库统计按最近一次成功导入持久化缓存到插件 `runtime/`，客户端另有 120 秒仪表盘缓存。
 
 ### 2.3 写入留痕机制（Provenance）
 所有通过本插件触发的写操作均带有明确标识 **`通过 dsh 3B健康插件写入`**（`plugin_id: "@local/dsh-3b-health"`）：
