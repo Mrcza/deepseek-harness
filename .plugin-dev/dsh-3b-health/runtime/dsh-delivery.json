@@ -1,0 +1,7 @@
+{
+  "channel": "telegram",
+  "botId": "telegram_95ca30834b3cefdee66fe51a",
+  "targetId": "tgt_7a07658e253be51b",
+  "mode": "photo",
+  "note": "3B健康每日侧栏图片推送；token 与 chatId 由脚本从 ~/.dsh/integrations/dsh-telegram 解析"
+}

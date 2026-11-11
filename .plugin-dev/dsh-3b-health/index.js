@@ -27,6 +27,8 @@ const PERIOD_VERSION = 'health-period-1'
 
 const DEFAULT_METRICS = ['sleep', 'steps', 'active_energy', 'body_mass', 'body_fat', 'lean_body_mass']
 const DEFAULT_PERIODS = [30, 30, 30, 30, 30, 30]
+/** Physiological baseline used to derive age/sex/height standards until the user edits it. */
+const DEFAULT_PROFILE = { birth_year: 1992, sex: 'male', height_cm: 168 }
 const STORE_RETIRED_MARKER = '.datacenter-retired'
 const MIGRATION_MARKER = '.dsh-3b-health-migrated.json'
 const CODEX_DIRNAME = '生活助手codex'
@@ -162,21 +164,7 @@ function localRuntimeDir(home) {
 }
 
 /**
- * @param {string} sourcePath store file
- * @param {string} copyPath runtime copy
- * @returns {boolean} true when the store file is newer or a different size
- */
-function isStaleRuntimeCopy(sourcePath, copyPath) {
-  try {
-    const sourceInfo = statSync(sourcePath)
-    const copyInfo = statSync(copyPath)
-    return sourceInfo.mtimeMs > copyInfo.mtimeMs || sourceInfo.size !== copyInfo.size
-  } catch (_e) {
-    return false
-  }
-}
-
-/**
+ * Copy a plugin-owned file into the local runtime directory.
  * @param {string} sourcePath store file
  * @param {string} targetPath runtime copy
  * @param {string} runtimeDir runtime directory
@@ -194,25 +182,26 @@ function writeRuntimeCopy(sourcePath, targetPath, runtimeDir) {
 }
 
 /**
- * Resolve a store JSON file to its local runtime copy.
- * Read-only files refresh when the store file is newer; plugin-owned write
- * targets keep the runtime copy as their source of truth.
+ * Resolve a JSON file to its local runtime copy.
+ * DataCenter-owned files (summary and sync state) are read-only here: the runtime
+ * copy wins whenever it exists, the store is only a legacy fallback, and this
+ * function never writes them back. Plugin-owned preferences and traces may copy
+ * from the store once when the runtime file is missing.
  * @param {string | null} dir store data directory
  * @param {string} source store source
  * @param {string} home user home
  * @param {string} filename file name
- * @param {boolean} [refreshFromSource] refresh the runtime copy from the store file
+ * @param {boolean} [pluginOwned] whether the plugin may create the runtime copy
  * @returns {string | null} path to read or write
  */
-function resolveRuntimeFile(dir, source, home, filename, refreshFromSource = false) {
+function resolveRuntimeFile(dir, source, home, filename, pluginOwned = false) {
   if (!dir) return null
   if (source === 'datacenter') {
     const rtDir = localRuntimeDir(home)
     const rtPath = join(rtDir, filename)
+    if (existsSync(rtPath)) return rtPath
     const dcPath = join(dir, filename)
-    const missing = !existsSync(rtPath)
-    const stale = refreshFromSource && existsSync(dcPath) && isStaleRuntimeCopy(dcPath, rtPath)
-    if (existsSync(dcPath) && (missing || stale)) {
+    if (pluginOwned && existsSync(dcPath)) {
       try {
         writeRuntimeCopy(dcPath, rtPath, rtDir)
         return rtPath
@@ -220,8 +209,7 @@ function resolveRuntimeFile(dir, source, home, filename, refreshFromSource = fal
         return dcPath
       }
     }
-    // Write targets always resolve to the runtime path so plugin-owned state stays local.
-    return existsSync(rtPath) || !refreshFromSource ? rtPath : dcPath
+    return existsSync(dcPath) ? dcPath : rtPath
   }
   return join(dir, filename)
 }
@@ -240,10 +228,10 @@ function resolvePaths(store = resolveStore()) {
     runtimeDir: store.source === 'datacenter' ? localRuntimeDir(home) : dir,
     lifeDb: dir ? join(dir, 'life.sqlite3') : null,
     exportsDb: dir ? join(dir, 'health-exports.sqlite3') : null,
-    summaryJson: resolveRuntimeFile(dir, store.source, home, 'health-summary.json', true),
-    syncJson: resolveRuntimeFile(dir, store.source, home, 'health-export-sync.json', true),
-    prefsJson: resolveRuntimeFile(dir, store.source, home, 'dsh-health-preferences.json'),
-    tracesJsonl: resolveRuntimeFile(dir, store.source, home, 'dsh-plugin-traces.jsonl'),
+    summaryJson: resolveRuntimeFile(dir, store.source, home, 'health-summary.json'),
+    syncJson: resolveRuntimeFile(dir, store.source, home, 'health-export-sync.json'),
+    prefsJson: resolveRuntimeFile(dir, store.source, home, 'dsh-health-preferences.json', true),
+    tracesJsonl: resolveRuntimeFile(dir, store.source, home, 'dsh-plugin-traces.jsonl', true),
     analysisRoot: join(home, 'Library', 'Application Support', 'ThreeBody', 'AgentAnalysis'),
   }
 }
@@ -536,6 +524,37 @@ function getTraces(limit = 50) {
   return { items, source_label: PLUGIN_LABEL }
 }
 
+/**
+ * Validate a stored or submitted physiological baseline, keeping the previous
+ * value for every field that is missing or out of range.
+ * @param {unknown} input candidate profile fields
+ * @param {{ birth_year: number, sex: string, height_cm: number }} fallback values used on invalid input
+ * @returns {{ birth_year: number, sex: string, height_cm: number }} cleaned profile
+ */
+function cleanProfile(input, fallback) {
+  const base = fallback && typeof fallback === 'object' ? fallback : DEFAULT_PROFILE
+  const src = input && typeof input === 'object' && !Array.isArray(input) ? input : {}
+  const birthYear = Number.parseInt(String(src.birth_year), 10)
+  const sex = src.sex === 'male' || src.sex === 'female' ? src.sex : base.sex
+  const height = Number.parseFloat(String(src.height_cm))
+  return {
+    birth_year: Number.isInteger(birthYear) && birthYear >= 1920 && birthYear <= 2020 ? birthYear : base.birth_year,
+    sex: sex === 'male' || sex === 'female' ? sex : DEFAULT_PROFILE.sex,
+    height_cm: Number.isFinite(height) && height >= 100 && height <= 230
+      ? Math.round(height * 10) / 10
+      : base.height_cm,
+  }
+}
+
+/**
+ * Age in the Shanghai calendar year, matching the plugin's other date handling.
+ * @param {{ birth_year: number }} profile cleaned profile
+ * @returns {number} age in years
+ */
+function profileAge(profile) {
+  return Number(todayShanghaiStr().slice(0, 4)) - profile.birth_year
+}
+
 function getPreferences(store = resolveStore()) {
   const paths = resolvePaths(store)
   ensureMigrated(store, paths)
@@ -551,6 +570,7 @@ function getPreferences(store = resolveStore()) {
           metrics: data.metrics.map(String),
           periods: data.periods.map(p => ([30, 90, 365].includes(Number(p)) ? Number(p) : 30)),
           stage_days: [30, 90, 365].includes(Number(data.stage_days)) ? Number(data.stage_days) : 30,
+          profile: cleanProfile(data.profile, DEFAULT_PROFILE),
           updated_at: data.updated_at || null,
           source_label: data.source_label || PLUGIN_LABEL,
         }
@@ -561,6 +581,7 @@ function getPreferences(store = resolveStore()) {
     metrics: [...DEFAULT_METRICS],
     periods: [...DEFAULT_PERIODS],
     stage_days: 30,
+    profile: { ...DEFAULT_PROFILE },
     updated_at: null,
     source_label: PLUGIN_LABEL,
   }
@@ -581,12 +602,18 @@ function savePreferences(payload) {
   const cleanMetrics = metrics.map(m => String(m).trim())
   const cleanPeriods = periods.map(p => ([30, 90, 365].includes(Number(p)) ? Number(p) : 30))
   const cleanStage = [30, 90, 365].includes(Number(stageDays)) ? Number(stageDays) : 30
+  const submittedProfile = payload.profile && typeof payload.profile === 'object' && !Array.isArray(payload.profile)
+  const cleanProfileDoc = submittedProfile ? cleanProfile(payload.profile, current.profile) : current.profile
+  const profileNote = submittedProfile
+    ? `；生理基准：${cleanProfileDoc.birth_year}年(${profileAge(cleanProfileDoc)}岁)/${cleanProfileDoc.sex === 'male' ? '男' : '女'}/${cleanProfileDoc.height_cm}cm`
+    : ''
 
   mkdirSync(privateDir, { recursive: true, mode: 0o700 })
   const doc = {
     metrics: cleanMetrics,
     periods: cleanPeriods,
     stage_days: cleanStage,
+    profile: cleanProfileDoc,
     updated_at: nowShanghaiIso(),
     plugin_id: PLUGIN_ID,
     source_label: PLUGIN_LABEL,
@@ -595,7 +622,7 @@ function savePreferences(payload) {
 
   recordTrace(
     'save_preferences',
-    `保存 6 图健康趋势偏好：${cleanMetrics.join(', ')}（周期 ${cleanPeriods.join('/')} 天，阶段总结 ${cleanStage} 天）`,
+    `保存 6 图健康趋势偏好：${cleanMetrics.join(', ')}（周期 ${cleanPeriods.join('/')} 天，阶段总结 ${cleanStage} 天）${profileNote}`,
     'dsh-health-preferences.json',
     doc,
     paths,

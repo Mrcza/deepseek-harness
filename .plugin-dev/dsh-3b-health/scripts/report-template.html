@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>3B健康侧栏摘要</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #f1efea; }
+  #report {
+    width: 720px;
+    padding: 34px 36px 30px;
+    background: #f1efea;
+    color: #0a0a0b;
+    font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .serif { font-family: 'Songti SC', 'Noto Serif SC', Georgia, 'Times New Roman', serif; }
+  .mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+  .head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(10, 10, 11, 0.55);
+  }
+  .brand { font-size: 26px; line-height: 32px; font-weight: 500; letter-spacing: 0.02em; }
+  .date { font-size: 12px; color: #6b675f; }
+  .baseline {
+    padding: 12px 0;
+    font-size: 12.5px;
+    color: #3f3d39;
+    border-bottom: 1px solid rgba(10, 10, 11, 0.16);
+  }
+  .hero {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    padding: 22px 0;
+    border-bottom: 1px solid rgba(10, 10, 11, 0.55);
+  }
+  .hero-score { flex: none; display: flex; align-items: baseline; gap: 4px; }
+  .hero-score strong { font-family: 'Songti SC', 'Noto Serif SC', Georgia, serif; font-size: 58px; line-height: 60px; font-weight: 500; letter-spacing: -0.01em; }
+  .hero-score span { font-size: 12px; color: #6b675f; }
+  .hero-body h2 { margin: 2px 0 6px; font-size: 16px; line-height: 22px; font-weight: 500; }
+  .hero-body p { margin: 0; font-size: 13px; line-height: 20px; color: #3f3d39; }
+  section { padding-top: 20px; }
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .section-head h3 { margin: 0; font-size: 16px; line-height: 22px; font-weight: 500; }
+  .section-head span { font-size: 11px; color: #8a857c; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .fc {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 14px 16px;
+    border: 1px solid rgba(10, 10, 11, 0.16);
+    background: #f7f5f1;
+  }
+  .fc-head { display: flex; align-items: center; gap: 8px; }
+  .fc-head h4 { margin: 0; flex: 1; font-size: 13px; line-height: 18px; font-weight: 500; color: #3f3d39; }
+  .pill { font-size: 10px; line-height: 16px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; }
+  .pill.good { color: #2e6b4f; }
+  .pill.warn { color: #9b5a2e; }
+  .fc-value { display: flex; align-items: baseline; gap: 4px; }
+  .fc-value strong { font-family: 'Songti SC', 'Noto Serif SC', Georgia, serif; font-size: 26px; line-height: 30px; font-weight: 500; }
+  .fc-value .unit { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; color: #6b675f; }
+  .fc-value .delta { margin-left: auto; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; color: #8a857c; }
+  .fc-sub { margin: 0; font-size: 11px; line-height: 16px; color: #6b675f; }
+  .fc-gap { margin: 0; font-size: 11.5px; line-height: 17px; color: #9b5a2e; }
+  .fc-gap.good { color: #2e6b4f; }
+  .fc-gap .action { color: #6b675f; }
+  .grid-wrap { padding: 10px 12px 4px; border: 1px solid rgba(10, 10, 11, 0.16); background: #f7f5f1; }
+  .grid-wrap svg { display: block; width: 100%; height: auto; }
+  .empty { margin: 12px; font-size: 12px; color: #8a857c; }
+  .targets { list-style: none; margin: 0; padding: 0; border-top: 1px solid rgba(10, 10, 11, 0.16); }
+  .targets li {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid rgba(10, 10, 11, 0.16);
+  }
+  .t-label { font-size: 12px; line-height: 17px; color: #3f3d39; }
+  .t-value { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; line-height: 17px; text-align: right; color: #0a0a0b; }
+  .t-value.warn { color: #9b5a2e; }
+  .t-value.good { color: #2e6b4f; }
+  .t-gap { grid-column: 1 / -1; font-size: 10.5px; line-height: 15px; color: #8a857c; }
+  .foot {
+    margin-top: 18px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(10, 10, 11, 0.55);
+    font-size: 10.5px;
+    line-height: 16px;
+    color: #8a857c;
+  }
+</style>
+</head>
+<body>
+<div id="report">
+  <div class="head">
+    <div class="brand serif">3B健康</div>
+    <div class="date mono">{{DATE}}</div>
+  </div>
+  <div class="baseline mono">{{PROFILE}}</div>
+  <div class="hero">
+    <div class="hero-score"><strong>{{SCORE}}</strong><span>分</span></div>
+    <div class="hero-body">
+      <h2 class="serif">综合健康评分</h2>
+      <p>{{ADVICE}}</p>
+    </div>
+  </div>
+  <section>
+    <div class="section-head"><h3 class="serif">重点关注</h3><span>五域保底 + 全局补位 · 按关注度排序</span></div>
+    <div class="cards">{{CARDS}}</div>
+  </section>
+  <section>
+    <div class="section-head"><h3 class="serif">身体类型</h3><span>{{ZONE}}</span></div>
+    <div class="grid-wrap">{{GRID}}</div>
+  </section>
+  <section>
+    <div class="section-head"><h3 class="serif">向健康改进的目标</h3><span>{{TARGET_COUNT}}</span></div>
+    <ul class="targets">{{TARGETS}}</ul>
+  </section>
+  <div class="foot mono">{{FOOTER}}</div>
+</div>
+</body>
+</html>
