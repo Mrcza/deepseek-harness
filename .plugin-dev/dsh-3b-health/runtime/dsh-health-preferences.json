@@ -3,9 +3,9 @@
     "body_mass",
     "body_fat",
     "sleep",
-    "hrv",
+    "workout",
     "vo2max",
-    "resting_hr"
+    "hr_recovery"
   ],
   "periods": [
     30,
@@ -13,10 +13,16 @@
     30,
     30,
     365,
-    30
+    365
   ],
   "stage_days": 30,
-  "updated_at": "2026-11-11T09:31:16+08:00",
+  "focus_rule": "balanced",
+  "profile": {
+    "birth_year": 1992,
+    "sex": "male",
+    "height_cm": 168
+  },
+  "updated_at": "2026-11-16T14:10:15+08:00",
   "plugin_id": "@local/dsh-3b-health",
   "source_label": "通过 dsh 3B健康插件写入"
 }

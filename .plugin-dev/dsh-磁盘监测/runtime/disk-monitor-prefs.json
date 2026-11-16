@@ -1,0 +1,16 @@
+{
+  "selectedIds": [
+    "vol::internal::Macintosh HD",
+    "vol::external::BackupDisk",
+    "vol::external::DataDisk",
+    "vol::external::My Passport"
+  ],
+  "knownIds": [
+    "vol::internal::Macintosh HD",
+    "vol::external::BackupDisk",
+    "vol::external::DataDisk",
+    "vol::external::My Passport"
+  ],
+  "days": 30,
+  "updatedAt": "2026-11-16T09:56:18+08:00"
+}

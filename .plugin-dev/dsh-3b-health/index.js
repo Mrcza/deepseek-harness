@@ -4,6 +4,7 @@
  * 生活助手codex health database and JSON snapshots with zero port conflict
  * and full write provenance ("通过 dsh 3B健康插件写入").
  */
+import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import {
   appendFileSync,
@@ -17,8 +18,9 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+import { fileURLToPath } from 'node:url'
 
 const PLUGIN_ID = '@local/dsh-3b-health'
 const PLUGIN_LABEL = '通过 dsh 3B健康插件写入'
@@ -29,6 +31,19 @@ const DEFAULT_METRICS = ['sleep', 'steps', 'active_energy', 'body_mass', 'body_f
 const DEFAULT_PERIODS = [30, 30, 30, 30, 30, 30]
 /** Physiological baseline used to derive age/sex/height standards until the user edits it. */
 const DEFAULT_PROFILE = { birth_year: 1992, sex: 'male', height_cm: 168 }
+
+/** 侧栏「重点关注」选卡规则；缺省为分域保底。 */
+const FOCUS_RULE_IDS = ['domain', 'severity', 'shortfall', 'balanced', 'deviation']
+const DEFAULT_FOCUS_RULE = 'domain'
+
+/** 每日图片推送由 macOS launchd 直接运行脚本，不经过 DSH 定时任务，也不消耗模型 token。 */
+const PUSH_LABEL = 'local.3b-health.push'
+const PUSH_PLIST_FILENAME = PUSH_LABEL + '.plist'
+const PUSH_STATE_FILENAME = 'health-push.json'
+const PUSH_HOUR = 10
+const PUSH_MINUTE = 0
+const PLUGIN_ROOT = dirname(fileURLToPath(import.meta.url))
+const PUSH_SCRIPT_PATH = join(PLUGIN_ROOT, 'scripts', 'focus-report-image.mjs')
 const STORE_RETIRED_MARKER = '.datacenter-retired'
 const MIGRATION_MARKER = '.dsh-3b-health-migrated.json'
 const CODEX_DIRNAME = '生活助手codex'
@@ -570,6 +585,7 @@ function getPreferences(store = resolveStore()) {
           metrics: data.metrics.map(String),
           periods: data.periods.map(p => ([30, 90, 365].includes(Number(p)) ? Number(p) : 30)),
           stage_days: [30, 90, 365].includes(Number(data.stage_days)) ? Number(data.stage_days) : 30,
+          focus_rule: FOCUS_RULE_IDS.includes(data.focus_rule) ? data.focus_rule : DEFAULT_FOCUS_RULE,
           profile: cleanProfile(data.profile, DEFAULT_PROFILE),
           updated_at: data.updated_at || null,
           source_label: data.source_label || PLUGIN_LABEL,
@@ -581,6 +597,7 @@ function getPreferences(store = resolveStore()) {
     metrics: [...DEFAULT_METRICS],
     periods: [...DEFAULT_PERIODS],
     stage_days: 30,
+    focus_rule: DEFAULT_FOCUS_RULE,
     profile: { ...DEFAULT_PROFILE },
     updated_at: null,
     source_label: PLUGIN_LABEL,
@@ -602,6 +619,7 @@ function savePreferences(payload) {
   const cleanMetrics = metrics.map(m => String(m).trim())
   const cleanPeriods = periods.map(p => ([30, 90, 365].includes(Number(p)) ? Number(p) : 30))
   const cleanStage = [30, 90, 365].includes(Number(stageDays)) ? Number(stageDays) : 30
+  const focusRule = FOCUS_RULE_IDS.includes(payload.focus_rule) ? payload.focus_rule : current.focus_rule
   const submittedProfile = payload.profile && typeof payload.profile === 'object' && !Array.isArray(payload.profile)
   const cleanProfileDoc = submittedProfile ? cleanProfile(payload.profile, current.profile) : current.profile
   const profileNote = submittedProfile
@@ -613,6 +631,7 @@ function savePreferences(payload) {
     metrics: cleanMetrics,
     periods: cleanPeriods,
     stage_days: cleanStage,
+    focus_rule: focusRule,
     profile: cleanProfileDoc,
     updated_at: nowShanghaiIso(),
     plugin_id: PLUGIN_ID,
@@ -1067,6 +1086,180 @@ function buildDiagnostics(store, paths, healthData, folderSync) {
   }
 }
 
+/**
+ * Resolve the launchd plist, state file and log paths for the daily push.
+ * @param {object} paths resolved plugin paths
+ * @returns {{ runtimeDir: string | null, stateJson: string | null, plistPath: string, logPath: string | null }}
+ */
+function pushPaths(paths) {
+  return {
+    runtimeDir: paths.runtimeDir,
+    stateJson: paths.runtimeDir ? join(paths.runtimeDir, PUSH_STATE_FILENAME) : null,
+    plistPath: join(userHome(), 'Library', 'LaunchAgents', PUSH_PLIST_FILENAME),
+    logPath: paths.runtimeDir ? join(paths.runtimeDir, 'push.log') : null,
+  }
+}
+
+/** @returns {{ enabled: boolean, hour: number, minute: number, label: string, updated_at: string | null, source_label: string }} */
+function defaultPushState() {
+  return {
+    enabled: false,
+    hour: PUSH_HOUR,
+    minute: PUSH_MINUTE,
+    label: PUSH_LABEL,
+    updated_at: null,
+    source_label: PLUGIN_LABEL,
+  }
+}
+
+/**
+ * Read the persisted push toggle. A missing or unreadable file means disabled.
+ * @param {object} paths resolved plugin paths
+ * @returns {{ enabled: boolean, hour: number, minute: number, label: string, updated_at: string | null, source_label: string }}
+ */
+function readPushState(paths) {
+  const target = pushPaths(paths)
+  if (target.stateJson && existsSync(target.stateJson)) {
+    try {
+      const data = JSON.parse(readFileSync(target.stateJson, 'utf8'))
+      return {
+        enabled: data.enabled === true,
+        hour: Number.isInteger(data.hour) ? data.hour : PUSH_HOUR,
+        minute: Number.isInteger(data.minute) ? data.minute : PUSH_MINUTE,
+        label: PUSH_LABEL,
+        updated_at: data.updated_at || null,
+        source_label: PLUGIN_LABEL,
+      }
+    } catch (_e) {
+      // 状态文件损坏时按关闭处理
+    }
+  }
+  return defaultPushState()
+}
+
+/**
+ * @param {string} value text inserted into the plist
+ * @returns {string} XML-escaped text
+ */
+function xmlEscape(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+/**
+ * Render the LaunchAgent that runs the image report every day at PUSH_HOUR:PUSH_MINUTE.
+ * @param {string} nodePath absolute node binary
+ * @param {string} scriptPath absolute report script
+ * @param {string} workingDirectory plugin root
+ * @param {string} logPath stdout/stderr log file
+ * @returns {string} plist XML
+ */
+function pushPlistText(nodePath, scriptPath, workingDirectory, logPath) {
+  const argLines = [nodePath, scriptPath, '--send']
+    .map((arg) => '\t\t<string>' + xmlEscape(arg) + '</string>')
+    .join('\n')
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'
+    + '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+    + '<plist version="1.0">\n<dict>\n'
+    + '\t<key>Label</key>\n\t<string>' + xmlEscape(PUSH_LABEL) + '</string>\n'
+    + '\t<key>ProgramArguments</key>\n\t<array>\n' + argLines + '\n\t</array>\n'
+    + '\t<key>WorkingDirectory</key>\n\t<string>' + xmlEscape(workingDirectory) + '</string>\n'
+    + '\t<key>StartCalendarInterval</key>\n\t<dict>\n\t\t<key>Hour</key>\n\t\t<integer>' + PUSH_HOUR + '</integer>\n\t\t<key>Minute</key>\n\t\t<integer>' + PUSH_MINUTE + '</integer>\n\t</dict>\n'
+    + '\t<key>StandardOutPath</key>\n\t<string>' + xmlEscape(logPath) + '</string>\n'
+    + '\t<key>StandardErrorPath</key>\n\t<string>' + xmlEscape(logPath) + '</string>\n'
+    + '\t<key>EnvironmentVariables</key>\n\t<dict>\n\t\t<key>TZ</key>\n\t\t<string>Asia/Shanghai</string>\n\t</dict>\n'
+    + '\t<key>RunAtLoad</key>\n\t<false/>\n'
+    + '</dict>\n</plist>\n'
+}
+
+/**
+ * Run one launchctl command without a shell.
+ * @param {string[]} args launchctl arguments
+ * @returns {{ ok: boolean, output: string, error: string | null }}
+ */
+function launchctl(args) {
+  try {
+    const output = execFileSync('/bin/launchctl', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    return { ok: true, output: String(output || '').trim(), error: null }
+  } catch (error) {
+    const stderr = error && error.stderr ? String(error.stderr).trim() : ''
+    return { ok: false, output: '', error: stderr || (error instanceof Error ? error.message : String(error)) }
+  }
+}
+
+/** @returns {string} launchd GUI domain for the current user */
+function pushDomain() {
+  const uid = typeof process.getuid === 'function' ? process.getuid() : ''
+  return 'gui/' + String(uid)
+}
+
+/** @returns {boolean} whether the LaunchAgent is currently loaded */
+function isPushLoaded() {
+  return launchctl(['print', pushDomain() + '/' + PUSH_LABEL]).ok
+}
+
+/**
+ * Write the LaunchAgent and enable or disable it in the current user's GUI domain.
+ * The state file is only updated after launchctl succeeds, so the toggle reflects reality.
+ * @param {boolean} enabled desired state
+ * @returns {{ enabled: boolean, hour: number, minute: number, label: string, updated_at: string, source_label: string, plist: string, script: string, loaded: boolean }}
+ */
+function setPushEnabled(enabled) {
+  const store = resolveStore()
+  if (!store.usable) throw storeError(store.reason)
+  const paths = resolvePaths(store)
+  const target = pushPaths(paths)
+  if (!target.runtimeDir || !target.stateJson || !target.logPath) throw storeError('推送运行时目录不可用')
+  if (!existsSync(PUSH_SCRIPT_PATH)) throw new Error('推送脚本不存在：' + PUSH_SCRIPT_PATH)
+  mkdirSync(target.runtimeDir, { recursive: true, mode: 0o700 })
+  mkdirSync(dirname(target.plistPath), { recursive: true })
+  writeFileSync(target.plistPath, pushPlistText(process.execPath, PUSH_SCRIPT_PATH, PLUGIN_ROOT, target.logPath), 'utf8')
+  try {
+    chmodSync(target.plistPath, 0o644)
+  } catch (_e) {
+    // LaunchAgent 权限收紧失败不阻止加载
+  }
+  const domain = pushDomain()
+  const service = domain + '/' + PUSH_LABEL
+  launchctl(['bootout', service])
+  if (enabled) {
+    launchctl(['enable', service])
+    const boot = launchctl(['bootstrap', domain, target.plistPath])
+    if (!boot.ok) {
+      const error = new Error('launchctl bootstrap 失败：' + boot.error)
+      error.status = 500
+      throw error
+    }
+  } else {
+    launchctl(['disable', service])
+  }
+  const state = {
+    enabled: Boolean(enabled),
+    hour: PUSH_HOUR,
+    minute: PUSH_MINUTE,
+    label: PUSH_LABEL,
+    updated_at: nowShanghaiIso(),
+    source_label: PLUGIN_LABEL,
+  }
+  writeFileSync(target.stateJson, JSON.stringify(state, null, 2), 'utf8')
+  try {
+    chmodSync(target.stateJson, 0o600)
+  } catch (_e) {
+    // 状态文件权限收紧失败不影响切换
+  }
+  recordTrace(
+    enabled ? 'enable_health_push' : 'disable_health_push',
+    (enabled ? '开启' : '关闭') + '每日图片推送（launchd ' + PUSH_LABEL + '，每天 ' + PUSH_HOUR + ':' + String(PUSH_MINUTE).padStart(2, '0') + '）',
+    PUSH_STATE_FILENAME,
+    { ...state, plist: target.plistPath, script: PUSH_SCRIPT_PATH },
+    paths,
+  )
+  return { ...state, plist: target.plistPath, script: PUSH_SCRIPT_PATH, loaded: isPushLoaded() }
+}
+
 function getDashboard() {
   const store = resolveStore()
   const paths = resolvePaths(store)
@@ -1083,6 +1276,7 @@ function getDashboard() {
     diagnostics: buildDiagnostics(store, paths, healthData, folderSync),
     health: healthData,
     preferences: getPreferences(store),
+    push: readPushState(paths),
     checkins: listCheckins(30, store),
     sync_folder: folderSync,
     source_label: PLUGIN_LABEL,
@@ -1487,6 +1681,16 @@ async function handleFetchRequest(request) {
       return Response.json(savePreferences(body), { headers: { 'Cache-Control': 'no-store' } })
     }
 
+    if (method === 'POST' && subPath === 'push') {
+      const body = await request.json()
+      if (!body || typeof body.enabled !== 'boolean') {
+        const error = new Error('enabled 必须是布尔值')
+        error.status = 400
+        throw error
+      }
+      return Response.json(setPushEnabled(body.enabled), { headers: { 'Cache-Control': 'no-store' } })
+    }
+
     if (method === 'GET' && subPath === 'checkins') {
       const days = Number(url.searchParams.get('days') || '30')
       return Response.json(listCheckins(days), { headers: { 'Cache-Control': 'no-store' } })
@@ -1546,6 +1750,7 @@ const ROUTES = [
   { path: '/api/3b-health', methods: ['GET', 'POST'] },
   { path: '/api/3b-health/dashboard', methods: ['GET', 'POST'] },
   { path: '/api/3b-health/preferences', methods: ['POST'] },
+  { path: '/api/3b-health/push', methods: ['POST'] },
   { path: '/api/3b-health/checkins', methods: ['GET', 'POST'] },
   { path: '/api/3b-health/checkins/delete', methods: ['POST'] },
   { path: '/api/3b-health/sync', methods: ['GET', 'POST'] },

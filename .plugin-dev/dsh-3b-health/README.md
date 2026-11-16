@@ -5,7 +5,7 @@ DeepSeek Harness (`dsh`) 原生健康管理与 AI 分析插件，读取 DataCent
 ## 功能概览
 - **左侧栏入口**：注册 `sidebar.panellist` (`id: '3b-health'`)，显示“3B健康”。
 - **健康仪表盘**：7 日运动与睡眠卡片、可交互饮食记录与精力自评打卡、44 项指标 × 30/90/365 天六图趋势（后端持久化偏好）、健康阶段总结、近 7 日训练明细。
-- **健康关注侧栏**（仪表盘右侧）：生理基准（出生年份/性别/身高，保存于偏好并写入留痕）、六项二次派生指标（校准 BMI、脂肪量、FFMI、FMI、去脂基础代谢、步行心率负荷差）、五维 PAS 关注度 Top 6（分域保底 + 全局补位）、身体类型九宫格与近 15 天渐变轨迹（缺失日线性估算）、向健康改进的目标清单。全部数值由实时快照按固定公式计算，不写死。
+- **健康关注侧栏**（仪表盘右侧）：生理基准（出生年份/性别/身高，保存于偏好并写入留痕）、六项二次派生指标（校准 BMI、脂肪量、FFMI、FMI、去脂基础代谢、步行心率负荷差）、五维 PAS 关注度 Top 6（五种选卡规则可选）、身体类型九宫格与近 15 天渐变轨迹（缺失日线性估算）、向健康改进的目标清单。全部数值由实时快照按固定公式计算，不写死。
 - **手机同步**：只读展示 DataCenter 的 iCloud 健康导出同步状态与 SQLite 主库/增量库统计；导入与摘要由 `local.datacenter.health` 每 5 分钟执行。
 - **AI 健康分析**：一键生成只读脱敏分析数据包并直接跳回 DSH 会话窗口填入提示词发起分析，支持直接读取 `outputs/report.md`。
 - **写入留痕**：所有写入操作均标记 `通过 dsh 3B健康插件写入`，记录于活动 `life.sqlite3` (`dsh_plugin_traces` / `health_daily_checkins`) 与插件 `runtime/` 目录的 `dsh-plugin-traces.jsonl`。
@@ -36,6 +36,10 @@ cd /Users/brucechen/Documents/DataCenter
 .venv/bin/python -B scripts/datacenter_jobs.py --config "$HOME/Library/Application Support/ThreeBody/DataCenter/center.json" health
 ```
 
+## 「近 7 日」口径
+
+所有「近 7 日」数值以快照自身的 `window`（最新资料日往前 7 个自然日）为锚点。DataCenter 的 `health_workouts.summary()` 也以该日期为 `workouts` 明细块的窗口终点；插件读取时仍按快照窗口重新归集 `workouts.recent` 作为兜底（兼容修复前生成的旧快照），侧栏「周运动时长」、仪表盘「7日运动汇总」与「训练记录 · 近 7 日」因此同口径。周运动时长取快照窗口累计 `exercise_total` 与重算后 `workouts.total_minutes` 的较大值；明细被截断（`recent` 最多 10 条）或窗口内没有训练时保留原块，不把缺失推成 0。
+
 ## 快照新鲜度
 
 仪表盘显示 `资料截至`、`快照生成` 与数据目录；按 DataCenter 同步状态文件的 `pending`、`snapshot_pending`、`snapshot_error`，以及 `last_success` 晚于快照生成时间判断是否提示「有新导出未汇总」。最新资料日可能因导出截止时间而滞后于当天，图表只按有记录的数据点绘制，缺失不补零。
@@ -53,7 +57,7 @@ node scripts/focus-report.mjs                 # 只打印消息，不发送
 node scripts/focus-report.mjs --send          # 投递（需要已配置的投递目标）
 ```
 
-投递参数保存在 `runtime/dsh-im-target.json`：`{"botId":"wecom_...","targetId":"..."}`，也可用 `--target=`、`--bot=`、`--base=` 或 `DSH_IM_TARGET_ID`、`DSH_WEB_BASE` 覆盖。DSH 定时任务每天 10:00 在新会话中执行该脚本并回报结果；DSH 未运行时投递顺延到下次启动。健康快照与偏好只读，发送仅在显式 `--send` 时发生。
+投递参数保存在 `runtime/dsh-im-target.json`：`{"botId":"wecom_...","targetId":"..."}`，也可用 `--target=`、`--bot=`、`--base=` 或 `DSH_IM_TARGET_ID`、`DSH_WEB_BASE` 覆盖。该文本脚本用于手动补发；每日定时推送走下文的 launchd 开关。健康快照与偏好只读，发送仅在显式 `--send` 时发生。
 
 ### 图片版（JPEG）
 
@@ -69,7 +73,33 @@ node scripts/focus-report-image.mjs --send   # 投递到企业微信群机器人
 - **Telegram（默认）**：`runtime/dsh-delivery.json` 写 `{"channel":"telegram","botId":"telegram_...","targetId":"tgt_..."}`；脚本在发送时从 `~/.dsh/integrations/dsh-telegram` 解析 bot token 与目标 chatId，不把凭据写入插件。`mode: "document"` 用 `report-template.html`（1440×3586，保留原分辨率）；`mode: "photo"` 用 `report-template-photo.html`（1440×2512，长边在 Telegram 2560 上限内，不会被压到 1028 宽，正文更大更紧凑）。
 - **企业微信群机器人**：`runtime/wecom-webhook.json` 写 `{"url":"https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..."}`；图片上限 2MB，`--with-text` 追加一行摘要。
 
+当日数据未更新（`health-summary.json` 的 `latest_source_date` 与上海当天日期不一致）时，脚本不会发送旧数据图片，只通过同一通道发一句「请及时更新当日数据（当前数据截至 …）」的文字提醒；`--force` 可强制生成并发送。
+
 默认保留最近 30 张（`--keep=30`），当前样张约 300KB。
+
+### 定时方式（launchd，不经过 DSH 定时任务）
+
+侧栏右上角的「每日 10:00 图片推送」开关调用 `POST /api/3b-health/push`：
+
+- **开启**：写入 `~/Library/LaunchAgents/local.3b-health.push.plist`，把服务 `bootstrap` 到当前用户的 GUI 域；每天 10:00 由 launchd 直接运行 `node scripts/focus-report-image.mjs --send`。
+- **关闭**：`launchctl bootout` 并 `launchctl disable`，不再触发。
+- 状态保存在 `runtime/health-push.json`，切换写入 `enable_health_push` / `disable_health_push` 留痕；运行日志在 `runtime/push.log`。
+
+这条链路不经过 DSH 定时任务、不消耗模型 token，DSH 未运行时也能按时发送（只需 Mac 开机联网）。plist 里记录的是当前 Node 的绝对路径；切换 Node 版本后重新开关一次即可重写。
+
+## 重点关注选卡规则
+
+侧栏「重点关注」右上角的下拉框可切换五种选卡规则，选中结果保存在偏好的 `focus_rule` 字段（`dsh-health-preferences.json`），每日图片推送也按同一规则出图：
+
+| 规则 | 说明 |
+| --- | --- |
+| 分域保底 + 全局补位 | 五大生理域各取 PAS 最高分，再补一张全局最高分；保证每个维度都有代表项 |
+| 关注度 Top 6 | 按 PAS 降序取前 6，同源组（体重/BMI、体脂/FMI、FFMI/去脂体重）只保留一个 |
+| 短板优先 | 只列未达标指标；全部达标时回退到关注度 Top 6 |
+| 多样平衡 | 按 PAS 降序，每个生理域最多 2 张，同源去重 |
+| 相对偏离优先 | 按「超出健康边界的百分比」降序，只列未达标指标 |
+
+综合健康评分固定按「分域保底」口径计算，切换显示规则不会改变分数；「最需改进」建议文案跟随当前显示的卡片。
 
 ## 性能
 

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Disk Monitor",
+    "description": "Lightweight daily read/write monitor for physical internal and external disks with 30-day dual-bar charts and clean teardown on disable."
+  }
+}

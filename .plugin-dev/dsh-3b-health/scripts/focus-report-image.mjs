@@ -7,6 +7,10 @@
  *   node scripts/focus-report-image.mjs --out=/tmp/x.jpg
  *   node scripts/focus-report-image.mjs --send                # 按 runtime/dsh-delivery.json 投递
  *   node scripts/focus-report-image.mjs --send --mode=photo   # Telegram 以照片发送（默认 document）
+ *   node scripts/focus-report-image.mjs --force               # 数据未更新时仍生成并发送
+ *
+ * 当日数据判断：health.latest_source_date 与上海时区当天日期不一致时，只发送一句
+ * 「请及时更新当日数据（当前数据截至 …）」的文字提醒，不发送旧数据图片；--force 可跳过。
  *
  * 投递配置（优先级：命令行 > 环境变量 > 配置文件）：
  *   runtime/dsh-delivery.json  {"channel":"telegram","botId":"...","targetId":"...","mode":"document"}
@@ -279,6 +283,37 @@ const mode = modeOption === 'photo' ? 'photo' : 'document'
 const caption = option('caption') || ('3B健康 · ' + today + ' · 综合评分 ' + (model.score === null ? '—' : model.score) + ' 分')
 const templateName = mode === 'photo' ? 'report-template-photo.html' : 'report-template.html'
 const template = readFileSync(join(pluginRoot, 'scripts', templateName), 'utf8')
+const isTelegram = channel === 'telegram' || String(botId).indexOf('telegram_') === 0
+const dataDate = loaded.health && typeof loaded.health.latest_source_date === 'string' ? loaded.health.latest_source_date : ''
+const stale = dataDate !== today
+
+/* 当日数据未更新时只发一句话提醒，不发送旧数据图片；--force 可强制生成图片。 */
+if (stale && !flag('force')) {
+  const reminderText = '请及时更新当日数据（当前数据截至 ' + (dataDate || '未知') + '）'
+  if (!flag('send')) {
+    console.log(reminderText)
+    console.log('[focus-report-image] 今日数据未更新（dry-run，未发送）。加 --force 可强制生成图片。')
+    process.exit(0)
+  }
+  try {
+    if (isTelegram) {
+      const route = resolveTelegramRoute()
+      await sendTelegramText(route.token, route.chatId, reminderText)
+      console.log('[focus-report-image] 今日数据未更新（数据截至 ' + (dataDate || '未知') + '），已发送到 Telegram（文字提醒）')
+    } else {
+      const webhookUrl = resolveWebhook()
+      if (!webhookUrl) {
+        fail('未配置投递通道：写入 ' + deliveryConfigPath + '（Telegram）或 ' + webhookConfigPath + '（企业微信群机器人）。')
+      }
+      await postWebhook(webhookUrl, { msgtype: 'text', text: { content: reminderText } })
+      console.log('[focus-report-image] 今日数据未更新（数据截至 ' + (dataDate || '未知') + '），已发送到企业微信群机器人（文字提醒）')
+    }
+  } catch (error) {
+    fail(error.message)
+  }
+  process.exit(0)
+}
+
 let html = template
 html = fill(html, '{{DATE}}', esc(today + ' · 侧栏摘要'))
 html = fill(html, '{{PROFILE}}', esc('生理基准：' + (profile.sex === 'male' ? '男' : '女') + ' · ' + profile.age + '岁 (' + profile.birth_year + ') · ' + profile.height_cm + ' cm'))
@@ -352,6 +387,66 @@ function parseRef(text, ref) {
   return undefined
 }
 
+function resolveTelegramRoute() {
+  const dshHome = process.env.DSH_HOME || join(homedir(), '.dsh')
+  const channelDir = join(dshHome, 'integrations', 'dsh-telegram')
+  const botConfig = readJsonFile(join(channelDir, 'config.json'), 'Telegram 机器人配置')
+  const bots = Array.isArray(botConfig.bots) ? botConfig.bots : []
+  const bot = bots.find((item) => item.botId === botId)
+  if (!bot || !bot.tokenRef) {
+    fail('在 ' + join(channelDir, 'config.json') + ' 没找到机器人 ' + botId + ' 的 tokenRef')
+  }
+  const credentials = readFileSync(join(dshHome, '.credentials.yaml'), 'utf8')
+  const token = parseRef(credentials, bot.tokenRef)
+  if (!token) {
+    fail('在 ' + join(dshHome, '.credentials.yaml') + ' 没找到凭据 ' + bot.tokenRef)
+  }
+  const workspaces = readJsonFile(join(channelDir, 'workspaces.json'), 'Telegram 目标配置')
+  const targets = workspaces.deliveryTargets && workspaces.deliveryTargets[botId]
+  const target = targets && targets[targetId]
+  const chatId = target && target.route && target.route.chatId
+  if (!chatId) {
+    fail('在 ' + join(channelDir, 'workspaces.json') + ' 没找到目标 ' + targetId + ' 的 chatId')
+  }
+  return { token, chatId }
+}
+
+function resolveWebhook() {
+  let webhook = option('webhook') || process.env.WECOM_WEBHOOK
+  if (!webhook && existsSync(webhookConfigPath)) {
+    try {
+      const config = readJsonFile(webhookConfigPath, '群机器人配置')
+      webhook = typeof config.url === 'string' ? config.url.trim() : undefined
+    } catch (error) {
+      fail(error.message)
+    }
+  }
+  return webhook
+}
+
+async function sendTelegramText(token, chatId, text) {
+  const response = await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: String(chatId), text }),
+    signal: AbortSignal.timeout(20000),
+  }).catch((error) => {
+    throw new Error('调用 Telegram Bot API 失败：' + error.message)
+  })
+  const bodyText = await response.text().catch(() => '')
+  let body = null
+  try {
+    body = JSON.parse(bodyText)
+  } catch (_e) {
+    body = null
+  }
+  if (!response.ok || !body || body.ok !== true) {
+    throw new Error('Telegram 文字发送失败：HTTP ' + response.status + ' '
+      + (body && body.description ? body.description : (bodyText || '').slice(0, 300)))
+  }
+  return body
+}
+
 async function sendTelegram(token, chatId, modeName, captionText) {
   const fileBytes = readFileSync(outPath)
   const form = new FormData()
@@ -397,35 +492,15 @@ const stage = (message) => {
   if (verbose) console.error('[focus-report-image] ' + message)
 }
 
-const isTelegram = channel === 'telegram' || String(botId).indexOf('telegram_') === 0
 if (isTelegram) {
   stage('telegram target=' + botId + '/' + targetId)
   if (!botId || !targetId) {
     fail('Telegram 投递缺少 botId/targetId：写入 ' + deliveryConfigPath + '，或使用 --bot= / --target=。')
   }
-  const dshHome = process.env.DSH_HOME || join(homedir(), '.dsh')
-  const channelDir = join(dshHome, 'integrations', 'dsh-telegram')
-  const botConfig = readJsonFile(join(channelDir, 'config.json'), 'Telegram 机器人配置')
-  const bots = Array.isArray(botConfig.bots) ? botConfig.bots : []
-  const bot = bots.find((item) => item.botId === botId)
-  if (!bot || !bot.tokenRef) {
-    fail('在 ' + join(channelDir, 'config.json') + ' 没找到机器人 ' + botId + ' 的 tokenRef')
-  }
-  const credentials = readFileSync(join(dshHome, '.credentials.yaml'), 'utf8')
-  const token = parseRef(credentials, bot.tokenRef)
-  if (!token) {
-    fail('在 ' + join(dshHome, '.credentials.yaml') + ' 没找到凭据 ' + bot.tokenRef)
-  }
-  const workspaces = readJsonFile(join(channelDir, 'workspaces.json'), 'Telegram 目标配置')
-  const targets = workspaces.deliveryTargets && workspaces.deliveryTargets[botId]
-  const target = targets && targets[targetId]
-  const chatId = target && target.route && target.route.chatId
-  if (!chatId) {
-    fail('在 ' + join(channelDir, 'workspaces.json') + ' 没找到目标 ' + targetId + ' 的 chatId')
-  }
+  const route = resolveTelegramRoute()
   stage('chatId resolved, sending ' + mode + ' (' + sizeKb + ' KB)')
   try {
-    await sendTelegram(token, chatId, mode, caption)
+    await sendTelegram(route.token, route.chatId, mode, caption)
   } catch (error) {
     fail(error.message)
   }
@@ -434,15 +509,7 @@ if (isTelegram) {
   process.exit(0)
 }
 
-let webhook = option('webhook') || process.env.WECOM_WEBHOOK
-if (!webhook && existsSync(webhookConfigPath)) {
-  try {
-    const config = readJsonFile(webhookConfigPath, '群机器人配置')
-    webhook = typeof config.url === 'string' ? config.url.trim() : undefined
-  } catch (error) {
-    fail(error.message)
-  }
-}
+const webhook = resolveWebhook()
 if (!webhook) {
   fail('未配置投递通道：写入 ' + deliveryConfigPath + '（Telegram）或 ' + webhookConfigPath
     + '（企业微信群机器人），或设置 DSH_DELIVERY_CHANNEL / WECOM_WEBHOOK。')

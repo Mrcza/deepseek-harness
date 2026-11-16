@@ -1,0 +1,3 @@
+- insert:
+    - id: dsh-disk-monitor
+      name: '@local/dsh-disk-monitor'

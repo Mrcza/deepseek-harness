@@ -1,0 +1,33 @@
+{
+  "name": "@local/dsh-disk-monitor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "磁盘监测：轻量统计主机连接的物理内置与外接磁盘每日读写情况，支持多盘筛选与近30天归藏杂志风双柱图表",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-layout"
+      ]
+    }
+  }
+}

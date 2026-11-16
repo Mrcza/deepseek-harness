@@ -1620,6 +1620,51 @@ window.__ModuleLoader__.load({
           }
         }
 
+        .dsh-3b-push-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          padding-bottom: 4px;
+        }
+        .dsh-3b-push-title {
+          font-size: 10.5px;
+          line-height: 16px;
+          color: var(--3b-ink-3);
+          letter-spacing: 0.02em;
+        }
+        .dsh-3b-push-toggle {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 2px 10px;
+          border: 1px solid var(--3b-rule-strong);
+          border-radius: 999px;
+          background: transparent;
+          color: var(--3b-ink-3);
+          font-size: 10.5px;
+          line-height: 16px;
+          cursor: pointer;
+        }
+        .dsh-3b-push-toggle::before {
+          content: '';
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--3b-ink-4);
+        }
+        .dsh-3b-push-toggle.on {
+          color: var(--3b-success);
+          border-color: currentColor;
+        }
+        .dsh-3b-push-toggle.on::before {
+          background: var(--3b-success);
+        }
+        .dsh-3b-push-toggle:disabled {
+          opacity: 0.6;
+          cursor: default;
+        }
+
         .dsh-3b-profile-bar {
           display: flex;
           flex-direction: column;
@@ -1712,7 +1757,31 @@ window.__ModuleLoader__.load({
         .dsh-3b-focus-section {
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 10px;
+        }
+        .dsh-3b-focus-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        }
+        .dsh-3b-focus-head-title {
+          margin: 0;
+          font-family: var(--3b-serif);
+          font-size: 14px;
+          line-height: 20px;
+          font-weight: 500;
+        }
+        .dsh-3b-focus-rule {
+          max-width: 190px;
+          height: 26px;
+          font-size: 11px;
+        }
+        .dsh-3b-focus-hint {
+          margin: 0;
+          font-size: 10.5px;
+          line-height: 15px;
+          color: var(--3b-ink-3);
         }
         .dsh-3b-focus-grid {
           display: grid;
@@ -2135,6 +2204,111 @@ window.__ModuleLoader__.load({
       lean_body_mass: 'lean',
     }
 
+    /* 重点关注选卡规则：同一份评分，不同取卡策略。 */
+    const FOCUS_RULES = [
+      { id: 'domain', label: '分域保底 + 全局补位', hint: '五大生理域各取最高分，再补一张全局最高分' },
+      { id: 'severity', label: '关注度 Top 6', hint: '按 PAS 降序取前 6，同源指标只保留一个' },
+      { id: 'shortfall', label: '短板优先', hint: '只列未达标指标；全部达标时回退到关注度 Top 6' },
+      { id: 'balanced', label: '多样平衡', hint: '按 PAS 降序，每个生理域最多 2 张，同源去重' },
+      { id: 'deviation', label: '相对偏离优先', hint: '按超出健康边界的百分比排序，只列未达标指标' },
+    ]
+    const FOCUS_RULE_IDS = FOCUS_RULES.map((rule) => rule.id)
+
+    function focusHomologyKey(card) {
+      return FOCUS_HOMOLOGY[card.id] || card.id
+    }
+
+    function focusRelativeDeviation(card) {
+      if (!card || !card.bounds || !(card.gap > 0)) return 0
+      const bounds = card.bounds
+      const reference = card.status === '偏高' && Number.isFinite(bounds.U)
+        ? bounds.U
+        : card.status === '不足' && Number.isFinite(bounds.L)
+          ? bounds.L
+          : bounds.margin
+      return card.gap / (Math.abs(reference) || 1)
+    }
+
+    function focusSelectCards(cards, ruleId) {
+      const sorted = cards.slice().sort((a, b) => b.pas - a.pas)
+      const rule = FOCUS_RULE_IDS.indexOf(String(ruleId)) >= 0 ? String(ruleId) : 'domain'
+      if (rule === 'severity') {
+        const seen = new Set()
+        const picked = []
+        for (const card of sorted) {
+          const key = focusHomologyKey(card)
+          if (seen.has(key)) continue
+          seen.add(key)
+          picked.push(card)
+          if (picked.length === 6) break
+        }
+        return picked
+      }
+      if (rule === 'shortfall') {
+        const seen = new Set()
+        const picked = []
+        for (const card of sorted) {
+          if (card.status === '标准') continue
+          const key = focusHomologyKey(card)
+          if (seen.has(key)) continue
+          seen.add(key)
+          picked.push(card)
+          if (picked.length === 6) break
+        }
+        if (picked.length > 0) return picked
+        const fallback = []
+        for (const card of sorted) {
+          const key = focusHomologyKey(card)
+          if (seen.has(key)) continue
+          seen.add(key)
+          fallback.push(card)
+          if (fallback.length === 6) break
+        }
+        return fallback
+      }
+      if (rule === 'balanced') {
+        const seen = new Set()
+        const counts = new Map()
+        const picked = []
+        for (const card of sorted) {
+          const key = focusHomologyKey(card)
+          if (seen.has(key)) continue
+          const used = counts.get(card.domain) || 0
+          if (used >= 2) continue
+          seen.add(key)
+          counts.set(card.domain, used + 1)
+          picked.push(card)
+          if (picked.length === 6) break
+        }
+        return picked
+      }
+      if (rule === 'deviation') {
+        const ranked = cards.slice()
+          .filter((card) => card.gap > 0)
+          .sort((a, b) => focusRelativeDeviation(b) - focusRelativeDeviation(a))
+        const source = ranked.length > 0 ? ranked : sorted
+        const seen = new Set()
+        const picked = []
+        for (const card of source) {
+          const key = focusHomologyKey(card)
+          if (seen.has(key)) continue
+          seen.add(key)
+          picked.push(card)
+          if (picked.length === 6) break
+        }
+        return picked
+      }
+      const byDomain = new Map()
+      for (const card of sorted) {
+        if (!byDomain.has(card.domain)) byDomain.set(card.domain, card)
+      }
+      const picked = Array.from(byDomain.values())
+      const used = new Set(picked.map((card) => FOCUS_HOMOLOGY[card.id]).filter(Boolean))
+      const wildcard = sorted.find((card) => !picked.includes(card)
+        && !(FOCUS_HOMOLOGY[card.id] && used.has(FOCUS_HOMOLOGY[card.id])))
+      return (wildcard ? picked.concat([wildcard]) : picked).sort((a, b) => b.pas - a.pas)
+    }
+
     const FOCUS_METRICS = [
       {
         id: 'body_fat',
@@ -2453,6 +2627,62 @@ window.__ModuleLoader__.load({
       return out
     }
 
+    /**
+     * 「近 7 日」训练视图：以快照自身的最新资料日为锚点重新归集 workouts 明细。
+     * DataCenter 的 workouts 块以最近一次训练为锚点，训练间隔较长时会滞后数日，
+     * 不能直接当作最近 7 天；明细完整可归集时重算，否则原样返回。
+     * @param {object | null} healthData health-summary.json
+     * @returns {object | null} workouts 块（按快照窗口重算或原样）
+     */
+    function focusWeeklyWorkouts(healthData) {
+      const workouts = healthData && healthData.workouts
+      if (!workouts || workouts.available !== true) return workouts || null
+      const window = Array.isArray(healthData.window)
+        ? healthData.window.filter((day) => typeof day === 'string')
+        : []
+      const recent = Array.isArray(workouts.recent) ? workouts.recent : []
+      if (window.length === 0 || recent.length === 0) return workouts
+      /* recent 只保留最近 10 条：明细被截断时无法判断窗口内是否完整，保留原块。 */
+      const count = focusNumber(workouts.count)
+      if (count !== null && count > recent.length) return workouts
+      const windowSet = new Set(window)
+      const scoped = recent.filter((item) => item && windowSet.has(item.date))
+      if (scoped.length === 0) return workouts
+      const minutesOf = (item) => focusNumber(item.minutes) || 0
+      const totalMinutes = focusRound(scoped.reduce((sum, item) => sum + minutesOf(item), 0), 1)
+      const energyRows = scoped.map((item) => focusNumber(item.energy_kcal)).filter((value) => value !== null)
+      const distanceRows = scoped.filter((item) => focusNumber(item.distance) !== null)
+      const allUnit = (unit) => distanceRows.length > 0 && distanceRows.every((item) => item.distance_unit === unit)
+      const distance = allUnit('m')
+        ? focusRound(distanceRows.reduce((sum, item) => sum + item.distance, 0) / 1000, 2)
+        : allUnit('km')
+          ? focusRound(distanceRows.reduce((sum, item) => sum + item.distance, 0), 2)
+          : null
+      const grouped = new Map()
+      for (const item of scoped) {
+        const label = typeof item.activity === 'string' && item.activity.trim() ? item.activity.trim() : '未命名运动'
+        const bucket = grouped.get(label) || { activity: label, count: 0, minutes: 0 }
+        bucket.count += 1
+        bucket.minutes += minutesOf(item)
+        grouped.set(label, bucket)
+      }
+      const byActivity = [...grouped.values()]
+        .map((bucket) => ({ ...bucket, minutes: focusRound(bucket.minutes, 1) }))
+        .sort((a, b) => b.count - a.count || b.minutes - a.minutes || a.activity.localeCompare(b.activity))
+      const latestWorkoutDate = scoped.reduce((last, item) => (item.date > last ? item.date : last), '')
+      return {
+        ...workouts,
+        window: window.slice(),
+        count: scoped.length,
+        total_minutes: totalMinutes,
+        total_energy_kcal: energyRows.length ? focusRound(energyRows.reduce((sum, value) => sum + value, 0), 1) : null,
+        total_distance_km: distance,
+        by_activity: byActivity,
+        recent: scoped,
+        latest_workout_date: latestWorkoutDate || workouts.latest_workout_date || null,
+      }
+    }
+
     function focusBuildMatrix(healthData, profile) {
       const trend = healthData && healthData.trend ? healthData.trend : null
       const window = trend && Array.isArray(trend.window) ? trend.window.slice() : []
@@ -2499,6 +2729,7 @@ window.__ModuleLoader__.load({
         const slice = dailyMove.slice(Math.max(0, index - 6), index + 1).filter((value) => focusNumber(value) !== null)
         return slice.length ? slice.reduce((sum, value) => sum + value, 0) : null
       })
+      const weeklyWorkouts = focusWeeklyWorkouts(healthData)
       const series = new Map(raw)
       series.set('derived_bmi', derivedBmi)
       series.set('derived_fat_mass', fatMass)
@@ -2522,7 +2753,8 @@ window.__ModuleLoader__.load({
         derivedFmi,
         derivedBmr,
         lastHeightCm: scaleHeightCm,
-        workoutCount: healthData && healthData.workouts ? healthData.workouts.count : null,
+        workoutCount: weeklyWorkouts ? weeklyWorkouts.count : null,
+        weeklyWorkouts,
       }
     }
 
@@ -2758,7 +2990,7 @@ window.__ModuleLoader__.load({
       }
     }
 
-    function evaluateHealthFocus(healthData, checkinsData, profile) {
+    function evaluateHealthFocus(healthData, checkinsData, profile, ruleId) {
       const clean = focusProfileClean(profile)
       const age = focusAgeOf(clean)
       const male = clean.sex === 'male'
@@ -2766,6 +2998,8 @@ window.__ModuleLoader__.load({
         available: false,
         profile: { ...clean, age, male },
         cards: [],
+        rule: 'domain',
+        rules: FOCUS_RULES,
         targets: [],
         score: null,
         advice: '',
@@ -2837,16 +3071,22 @@ window.__ModuleLoader__.load({
           }
         }
         if (def.id === 'weekly_exercise') {
+          /* 周运动时长取快照自身近 7 日窗口的累计分钟：workouts 明细块可能滞后，
+             用重算后的视图；exercise_total 覆盖窗口内无明细但仍有汇总的场景。 */
+          const weekly = matrix.weeklyWorkouts
           const total = Math.max(
-            Number(healthData && healthData.workouts && healthData.workouts.total_minutes) || 0,
+            Number(weekly && weekly.total_minutes) || 0,
             Number(healthData && healthData.exercise_total) || 0,
           )
           if (total > 0) {
-            const latest = healthData && healthData.workouts ? healthData.workouts.latest_workout_date : null
+            const latest = weekly ? weekly.latest_workout_date : null
             const lastIndex = latest ? matrix.window.lastIndexOf(latest) : value.lastIndex
+            const weeklyStats = ctx.stats.get('weekly_exercise')
+            const mean30 = weeklyStats ? weeklyStats.mean30 : null
             return {
               ...value,
               x: total,
+              delta: focusNumber(mean30) === null ? null : total - mean30,
               lastIndex: lastIndex >= 0 ? lastIndex : value.lastIndex,
               lastDate: latest || value.lastDate,
               weeklyTotal: true,
@@ -2956,18 +3196,13 @@ window.__ModuleLoader__.load({
         scored.push({ def, value: resolved, score: focusScore(def, ctx, resolved) })
       }
       const cards = scored.map(cardFor).sort((a, b) => b.pas - a.pas)
-      const byDomain = new Map()
-      for (const card of cards) {
-        if (!byDomain.has(card.domain)) byDomain.set(card.domain, card)
-      }
-      const picked = Array.from(byDomain.values())
-      const usedHomology = new Set(picked.map((card) => FOCUS_HOMOLOGY[card.id]).filter(Boolean))
-      const wildcard = cards.find((card) => !picked.includes(card)
-        && !(FOCUS_HOMOLOGY[card.id] && usedHomology.has(FOCUS_HOMOLOGY[card.id])))
-      const top = (wildcard ? picked.concat([wildcard]) : picked).sort((a, b) => b.pas - a.pas)
-      const weightSum = top.reduce((sum, card) => sum + card.weight, 0)
-      const pasSum = top.reduce((sum, card) => sum + card.weight * card.pas, 0)
-      const score = top.length > 0 && weightSum > 0 ? Math.round(100 - 35 * (pasSum / weightSum) / 100) : null
+      const focusRule = FOCUS_RULE_IDS.indexOf(String(ruleId)) >= 0 ? String(ruleId) : 'domain'
+      const top = focusSelectCards(cards, focusRule)
+      /* 综合评分固定按分域保底口径计算，切换显示规则不改变分数；建议文案跟随当前卡片。 */
+      const scoreCards = focusRule === 'domain' ? top : focusSelectCards(cards, 'domain')
+      const weightSum = scoreCards.reduce((sum, card) => sum + card.weight, 0)
+      const pasSum = scoreCards.reduce((sum, card) => sum + card.weight * card.pas, 0)
+      const score = scoreCards.length > 0 && weightSum > 0 ? Math.round(100 - 35 * (pasSum / weightSum) / 100) : null
       const improving = top.filter((card) => card.status !== '标准').slice(0, 2)
       const guardCandidates = top.filter((card) => card.status === '标准')
       const guard = guardCandidates.find((card) => card.id === 'derived_ffmi' || card.id === 'derived_bmr')
@@ -3080,6 +3315,8 @@ window.__ModuleLoader__.load({
         available: true,
         profile: { ...clean, age, male },
         cards: top,
+        rule: focusRule,
+        rules: FOCUS_RULES,
         targets,
         score,
         advice,
@@ -4704,7 +4941,8 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function FocusSidebar({ model, onSaveProfile, savingProfile, profileError }) {
+    function FocusSidebar({ model, onSaveProfile, savingProfile, profileError, push, onTogglePush, pushBusy, onChangeRule, ruleBusy }) {
+      const pushState = push || { enabled: false, hour: 10, minute: 0 }
       if (!model || !model.available) {
         return h(
           'aside',
@@ -4715,6 +4953,23 @@ window.__ModuleLoader__.load({
       return h(
         'aside',
         { className: 'dsh-3b-focus-sidebar', 'aria-label': '健康关注与标准差距' },
+        h(
+          'div',
+          { className: 'dsh-3b-push-bar' },
+          h('span', { className: 'dsh-3b-push-title' }, '每日 ' + String(pushState.hour).padStart(2, '0') + ':' + String(pushState.minute).padStart(2, '0') + ' 图片推送'),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'dsh-3b-push-toggle' + (pushState.enabled ? ' on' : ''),
+              'aria-pressed': Boolean(pushState.enabled),
+              disabled: Boolean(pushBusy),
+              title: '由 macOS launchd 定时运行脚本，不经过 DSH 定时任务，也不消耗 token',
+              onClick: onTogglePush,
+            },
+            pushBusy ? '切换中…' : (pushState.enabled ? '已开启' : '已关闭'),
+          ),
+        ),
         h(ProfileBar, {
           profile: model.profile,
           age: model.profile.age,
@@ -4729,12 +4984,21 @@ window.__ModuleLoader__.load({
           { className: 'dsh-3b-focus-section' },
           h(
             'div',
-            { className: 'dsh-3b-section-head' },
-            h('div', null,
-              h('h2', null, '重点关注'),
-              h('p', { className: 'dsh-3b-subtitle' }, '五域保底 + 全局补位 · 按关注度排序'),
+            { className: 'dsh-3b-focus-head' },
+            h('h2', { className: 'dsh-3b-focus-head-title' }, '重点关注'),
+            h(
+              'select',
+              {
+                className: 'dsh-3b-select dsh-3b-focus-rule',
+                value: model.rule || 'domain',
+                'aria-label': '重点关注选卡规则',
+                disabled: Boolean(ruleBusy),
+                onChange: (event) => onChangeRule(event.target.value),
+              },
+              model.rules.map((rule) => h('option', { key: rule.id, value: rule.id }, rule.label)),
             ),
           ),
+          h('p', { className: 'dsh-3b-focus-hint' }, ((model.rules.find((rule) => rule.id === (model.rule || 'domain')) || {}).hint) || ''),
           h('div', { className: 'dsh-3b-focus-grid' }, model.cards.map((card) => h(FocusCard, { key: card.id, card }))),
         ),
         h(BodyTypeGrid, { grid: model.grid }),
@@ -4757,6 +5021,8 @@ window.__ModuleLoader__.load({
       const [toastMsg, setToastMsg] = useState('')
       const [savingProfile, setSavingProfile] = useState(false)
       const [profileError, setProfileError] = useState('')
+      const [pushBusy, setPushBusy] = useState(false)
+      const [ruleBusy, setRuleBusy] = useState(false)
 
       useEffect(() => {
         injectStyles()
@@ -4806,6 +5072,7 @@ window.__ModuleLoader__.load({
         profile: DEFAULT_PROFILE,
       }
       const checkins = dash?.checkins
+      const pushState = dash?.push || { enabled: false, hour: 10, minute: 0 }
       const syncIssue = detectSyncIssue(dash?.sync_folder)
 
       const savePrefsBackend = async (nextMetrics, nextPeriods, nextStageDays) => {
@@ -4857,6 +5124,48 @@ window.__ModuleLoader__.load({
         }
       }
 
+      const saveFocusRule = async (nextRule) => {
+        setRuleBusy(true)
+        setErr('')
+        try {
+          const saved = await apiFetch('/api/3b-health/preferences', {
+            method: 'POST',
+            body: JSON.stringify({ focus_rule: nextRule }),
+          })
+          setDash(prev => (prev ? { ...prev, preferences: saved } : prev))
+          if (dashboardCache) {
+            dashboardCache = { data: { ...dashboardCache.data, preferences: saved }, at: Date.now() }
+          }
+          const rule = (focusModel.rules || []).find((item) => item.id === nextRule)
+          setToastMsg('已切换关注规则：' + (rule ? rule.label : nextRule))
+        } catch (e) {
+          setErr(e.message || '切换关注规则失败')
+        } finally {
+          setRuleBusy(false)
+        }
+      }
+
+      const togglePush = async () => {
+        const next = !pushState.enabled
+        setPushBusy(true)
+        setErr('')
+        try {
+          const saved = await apiFetch('/api/3b-health/push', {
+            method: 'POST',
+            body: JSON.stringify({ enabled: next }),
+          })
+          setDash(prev => (prev ? { ...prev, push: saved } : prev))
+          if (dashboardCache) {
+            dashboardCache = { data: { ...dashboardCache.data, push: saved }, at: Date.now() }
+          }
+          setToastMsg(next ? '已开启每日图片推送（launchd 定时，不消耗 token）' : '已关闭每日图片推送')
+        } catch (e) {
+          setErr(e.message || '切换图片推送失败')
+        } finally {
+          setPushBusy(false)
+        }
+      }
+
       const handleSelectMetric = (slotIdx, metricId) => {
         const nextMetrics = prefs.metrics.map((m, i) => (i === slotIdx ? metricId : m))
         savePrefsBackend(nextMetrics, prefs.periods, prefs.stage_days)
@@ -4880,8 +5189,8 @@ window.__ModuleLoader__.load({
 
       const metricsList = health?.trend?.metrics || []
       const focusModel = useMemo(
-        () => evaluateHealthFocus(health, checkins, prefs.profile || DEFAULT_PROFILE),
-        [health, checkins, prefs.profile],
+        () => evaluateHealthFocus(health, checkins, prefs.profile || DEFAULT_PROFILE, prefs.focus_rule),
+        [health, checkins, prefs.profile, prefs.focus_rule],
       )
       const stageDays = prefs.stage_days || 30
       const stageRows = useMemo(() => {
@@ -4911,7 +5220,8 @@ window.__ModuleLoader__.load({
 
       const dietSummary = checkins?.diet_summary
       const energySummary = checkins?.energy_summary
-      const workouts = health?.workouts
+      /* 与侧栏同一口径：训练明细按快照近 7 日窗口归集，避免沿用 DataCenter 的滞后锚点。 */
+      const workouts = focusWeeklyWorkouts(health)
 
       return h(
         'div',
@@ -5415,6 +5725,11 @@ window.__ModuleLoader__.load({
                       onSaveProfile: saveProfile,
                       savingProfile,
                       profileError,
+                      push: pushState,
+                      onTogglePush: togglePush,
+                      pushBusy,
+                      onChangeRule: saveFocusRule,
+                      ruleBusy,
                     }),
                   ),
                 ),
