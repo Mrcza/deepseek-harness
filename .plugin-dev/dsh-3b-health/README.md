@@ -111,3 +111,10 @@ node scripts/focus-report-image.mjs --send   # 投递到企业微信群机器人
 - 明暗主题跟随 DSH 的 light/dark 切换：浅色是暖纸墨字，深色是午夜墨配金色锚点；不依赖系统 `prefers-color-scheme`。九宫格区域色通过 `--3b-zone-*` 变量在深色下自动换成高亮变体。
 - 六图柱状图填充使用 PANTONE 2190 C 的 sRGB 近似 `#56B7E6`（`--3b-chart-bar`），明暗主题同色。
 - 页面宽 1320px：≥1100px 时仪表盘为「主列 + 368px 关注侧栏」双栏，**两列各自独立滚动**——页头与提示固定，滚轮只作用于指针所在的一列；窄屏回落单列整页滚动。顶部预留 `--dsh-frame-top-clearance`。只改展示层时，刷新页面或在「设置 → 插件」重载即可生效。
+
+## 配套工具：REST 影子接收服务（测试期）
+
+`ingest/` 目录提供独立的零依赖 Node.js 健康数据 REST 接收服务（配合 Cloudflare Tunnel + Access Service Token 使用），用于在不影响现有 iCloud 同步链路的前提下进行跨网直传双轨测试。
+
+- **隔离约定**：测试期默认写入 `~/Library/Application Support/ThreeBody/HealthIngest/staging/`，不触碰 iCloud `Health Data Export`、DataCenter SQLite 数据库或本插件 `runtime/`。
+- **详细文档与 4 阶段切换步骤**：见 [`ingest/README.md`](./ingest/README.md)。
