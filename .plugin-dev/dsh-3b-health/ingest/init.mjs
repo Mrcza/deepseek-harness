@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url'
 const HOME = process.env.HOME || homedir()
 const BASE_DIR = join(HOME, 'Library', 'Application Support', 'ThreeBody', 'HealthIngest')
 const CONFIG_PATH = join(BASE_DIR, 'config.json')
-const STAGING_DIR = join(BASE_DIR, 'staging')
+const INBOX_DIR = join(BASE_DIR, 'inbox')
 const LOG_PATH = join(BASE_DIR, 'ingest.log')
 const LAUNCHD_LABEL = 'local.health-ingest'
 const LOCAL_PLIST_PATH = join(BASE_DIR, `${LAUNCHD_LABEL}.plist`)
@@ -75,7 +75,7 @@ ${programArgs}
 }
 
 mkdirSync(BASE_DIR, { recursive: true, mode: 0o700 })
-mkdirSync(STAGING_DIR, { recursive: true, mode: 0o700 })
+mkdirSync(INBOX_DIR, { recursive: true, mode: 0o700 })
 
 let config
 let createdConfig = false
@@ -89,9 +89,9 @@ if (existsSync(CONFIG_PATH) && !force) {
     token: randomBytes(32).toString('hex'),
     max_body_bytes: 20 * 1024 * 1024,
     rate_limit_per_minute: 10,
-    output_dir: STAGING_DIR,
+    output_dir: INBOX_DIR,
     log_file: LOG_PATH,
-    mode: 'shadow-staging',
+    mode: 'active-inbox',
   }
   writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + '\n', { encoding: 'utf8', mode: 0o600 })
   chmodSync(CONFIG_PATH, 0o600)

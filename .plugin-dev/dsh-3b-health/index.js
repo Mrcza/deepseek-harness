@@ -859,31 +859,37 @@ function dbFileSignature(dbPath) {
 }
 
 /**
- * @param {string | null} sourceDir iCloud export directory
- * @returns {number | null} newest JSON/ZIP modification time, or null when unavailable
+ * @param {string | string[] | null} sourceDirs local inbox and/or iCloud export directories
+ * @returns {number | null} newest JSON/ZIP modification time across all readable directories, or null when unavailable
  */
-function newestExportMtime(sourceDir) {
-  if (!sourceDir || !existsSync(sourceDir)) return null
+function newestExportMtime(sourceDirs) {
+  const list = (Array.isArray(sourceDirs) ? sourceDirs : [sourceDirs])
+    .filter((d) => typeof d === 'string' && d.trim())
+  if (list.length === 0) return null
+  const cacheKey = list.join('|')
   const now = Date.now()
-  if (_exportMtimeCache.dir === sourceDir && now - _exportMtimeCache.at < 30000) {
+  if (_exportMtimeCache.dir === cacheKey && now - _exportMtimeCache.at < 30000) {
     return _exportMtimeCache.val
   }
   let newest = 0
-  try {
-    for (const name of readdirSync(sourceDir)) {
-      if (!name.endsWith('.json') && !name.endsWith('.zip')) continue
-      try {
-        const info = statSync(join(sourceDir, name))
-        if (info.mtimeMs > newest) newest = info.mtimeMs
-      } catch (_e) {
-        // one unreadable export must not hide the rest
+  for (const dir of list) {
+    if (!existsSync(dir)) continue
+    try {
+      for (const name of readdirSync(dir)) {
+        if (!name.endsWith('.json') && !name.endsWith('.zip')) continue
+        try {
+          const info = statSync(join(dir, name))
+          if (info.mtimeMs > newest) newest = info.mtimeMs
+        } catch (_e) {
+          // one unreadable export must not hide the rest
+        }
       }
+    } catch (_e) {
+      // one unreadable directory must not hide the other source
     }
-  } catch (_e) {
-    return null
   }
   const result = newest || null
-  _exportMtimeCache.dir = sourceDir
+  _exportMtimeCache.dir = cacheKey
   _exportMtimeCache.at = now
   _exportMtimeCache.val = result
   return result
@@ -1051,7 +1057,10 @@ function buildDiagnostics(store, paths, healthData, folderSync) {
     }
   } catch (_e) {}
   const latest = healthData?.latest_source_date || null
-  const newestExportAt = newestExportMtime(folderSync?.source || null)
+  const exportSources = Array.isArray(folderSync?.sources) && folderSync.sources.length
+    ? folderSync.sources
+    : (folderSync?.source || null)
+  const newestExportAt = newestExportMtime(exportSources)
   const summaryMs = summaryMtime ? Date.parse(summaryMtime) : null
   const lastSuccessMs = folderSync?.last_success ? Date.parse(folderSync.last_success) : null
   const pending = folderSync?.pending ?? null

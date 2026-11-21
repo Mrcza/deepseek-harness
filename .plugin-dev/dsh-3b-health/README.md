@@ -23,8 +23,9 @@ DeepSeek Harness (`dsh`) 原生健康管理与 AI 分析插件，读取 DataCent
 ## 数据流
 
 ```text
-iCloud Health Data Export/*.json
-  → local.datacenter.health（每 5 分钟）→ <store>/health-exports.sqlite3
+本地 Webhook 收件箱 (~/Library/Application Support/ThreeBody/HealthIngest/inbox/*.json)
+  + iCloud Health Data Export/*.json（兼容兜底）
+  → local.datacenter.health（每 5 分钟双源扫描）→ <store>/health-exports.sqlite3
   → health_summary.generate() → <store>/health-summary.json
   → 本插件只读 → 六图 / 七日卡 / 阶段总结 / AI 分析包
 ```
@@ -103,7 +104,7 @@ node scripts/focus-report-image.mjs --send   # 投递到企业微信群机器人
 
 ## 性能
 
-仪表盘请求只读 `health-export-sync.json`（约 4KB）、`health-summary.json` 与插件自有小表，不再扫描 2.69GB 的 `life.sqlite3.health_events`。导入统计来自 `files`/`workouts` 与 `imports` 小表（ZIP 事件总数取 `imports.added` 累计）；导出库统计按导入修订持久化缓存，新导入前不再打开 129MB 的导出库。打开面板的首屏数据通常在 300ms 内返回，重复打开直接使用 120 秒内存缓存并后台校验。
+仪表盘请求只读 `health-export-sync.json`（约 4KB）、`health-summary.json` 与插件自有小表，不再扫描 2.69GB 的 `life.sqlite3.health_events`。导入统计来自 `files`/`workouts` 与 `imports` 小表（ZIP 事件总数取 `imports.added` 累计）；导出库统计按导入修订持久化缓存，新导入前不再打开 129MB 的导出库。打开面板的首屏数据通常在 300ms 内返回，重复打开直接使用 120 秒内存缓存并后台校验；窗口切回前台（距上次拉取满 60 秒）或保持前台显示每 5 分钟自动静默刷新快照，新鲜度校验同时检查本地 `inbox/` 与 iCloud 两个目录。
 
 ## 界面与主题
 
@@ -112,9 +113,9 @@ node scripts/focus-report-image.mjs --send   # 投递到企业微信群机器人
 - 六图柱状图填充使用 PANTONE 2190 C 的 sRGB 近似 `#56B7E6`（`--3b-chart-bar`），明暗主题同色。
 - 页面宽 1320px：≥1100px 时仪表盘为「主列 + 368px 关注侧栏」双栏，**两列各自独立滚动**——页头与提示固定，滚轮只作用于指针所在的一列；窄屏回落单列整页滚动。顶部预留 `--dsh-frame-top-clearance`。只改展示层时，刷新页面或在「设置 → 插件」重载即可生效。
 
-## 配套工具：REST 影子接收服务（测试期）
+## 配套工具：Webhook 直传接收服务（已接入 DataCenter）
 
-`ingest/` 目录提供独立的零依赖 Node.js 健康数据 REST 接收服务（配合 Cloudflare Tunnel + Access Service Token 使用），用于在不影响现有 iCloud 同步链路的前提下进行跨网直传双轨测试。
+`ingest/` 目录提供独立的零依赖 Node.js 健康数据 Webhook 接收服务（配合 Cloudflare Tunnel + WAF Bearer Token 规则使用），承接 iPhone **HealthDataExport** 跨网直传。
 
-- **隔离约定**：测试期默认写入 `~/Library/Application Support/ThreeBody/HealthIngest/staging/`，不触碰 iCloud `Health Data Export`、DataCenter SQLite 数据库或本插件 `runtime/`。
-- **详细文档与 4 阶段切换步骤**：见 [`ingest/README.md`](./ingest/README.md)。
+- **落盘与接入**：服务将推送 JSON 原子写入本地收件箱 `~/Library/Application Support/ThreeBody/HealthIngest/inbox/`（绝不反写 iCloud 目录），由 `local.datacenter.health` 与原 iCloud 目录双源扫描导入，保持零破坏切换与一键回滚能力。
+- **详细文档与运维说明**：见 [`ingest/README.md`](./ingest/README.md)。

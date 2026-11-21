@@ -3943,7 +3943,7 @@ window.__ModuleLoader__.load({
               h(
                 'div',
                 { className: 'dsh-3b-title-row' },
-                h('h2', null, 'iCloud 文件夹自动同步'),
+                h('h2', null, '健康导出双源自动同步'),
                 h('span', { className: 'dsh-3b-badge accent' }, 'DataCenter 每 5 分钟'),
               ),
             ),
@@ -4018,10 +4018,15 @@ window.__ModuleLoader__.load({
             { className: 'dsh-3b-path' },
             `数据目录：${store.dir || '未解析'}${store.source === 'datacenter' ? '（DataCenter）' : ''}${store.usable === false ? ` · 不可用：${store.reason || '未知原因'}` : ''}`,
           ),
+          Array.isArray(folder?.sources) && folder.sources.length > 0 && h(
+            'p',
+            { className: 'dsh-3b-path' },
+            `扫描目录：${folder.sources.join(' · ')}`,
+          ),
           h(
             'p',
             { className: 'dsh-3b-metric-note' },
-            '手机通过 Health Auto Export 导出到 iCloud；导入与摘要由 DataCenter 的 local.datacenter.health 任务每 5 分钟执行。本插件只读取状态，不写入其状态文件。',
+            '手机通过 HealthDataExport Webhook 直传本地收件箱（inbox/）并兼容原 iCloud 目录；导入与摘要由 DataCenter 的 local.datacenter.health 任务每 5 分钟双源执行。本插件只读取状态，不写入其状态文件。',
           ),
         ),
         h(
@@ -4034,7 +4039,7 @@ window.__ModuleLoader__.load({
               'div',
               { className: 'dsh-3b-section-head' },
               h('h2', null, '健康 JSON 增量库 (health-exports.sqlite3)'),
-              h('span', { className: 'dsh-3b-badge' }, 'iCloud 自动导入'),
+              h('span', { className: 'dsh-3b-badge' }, '双源自动导入'),
             ),
             h(
               'div',
@@ -5053,6 +5058,30 @@ window.__ModuleLoader__.load({
         const t = setTimeout(() => setToastMsg(''), 4000)
         return () => clearTimeout(t)
       }, [toastMsg])
+
+      useEffect(() => {
+        // Refresh quietly when returning to a long-open panel or every 5 minutes
+        // while visible, matching DataCenter's 5-minute sync cadence.
+        const refreshIfStale = () => {
+          if (typeof document !== 'undefined' && document.hidden) return
+          if (!dashboardCache || Date.now() - dashboardCache.at >= 60000) {
+            loadDashboard(true)
+          }
+        }
+        const onVisibility = () => {
+          if (typeof document !== 'undefined' && !document.hidden) refreshIfStale()
+        }
+        if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility)
+        if (typeof window !== 'undefined') window.addEventListener('focus', refreshIfStale)
+        const periodic = setInterval(() => {
+          if (typeof document === 'undefined' || !document.hidden) loadDashboard(true)
+        }, 300000)
+        return () => {
+          if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility)
+          if (typeof window !== 'undefined') window.removeEventListener('focus', refreshIfStale)
+          clearInterval(periodic)
+        }
+      }, [loadDashboard])
 
       useEffect(() => {
         // While DataCenter is still regenerating the snapshot, poll quietly and

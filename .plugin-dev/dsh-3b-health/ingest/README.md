@@ -1,17 +1,18 @@
-# 健康数据 REST 影子接收服务（Cloudflare Tunnel + WAF 方案）
+# 健康数据 Webhook 接收服务（Cloudflare Tunnel + WAF 方案）
 
-本目录为 `dsh-3b-health` 的独立配套工具，用于承接 iPhone **HealthDataExport** 通过 **Webhook（HTTP POST + Bearer Token）** 跨网推送的健康导出 JSON。
+本目录为 `dsh-3b-health` 的独立配套工具，用于承接 iPhone **HealthDataExport** 通过 **Webhook（HTTP POST + Bearer Token）** 跨网推送的健康导出 JSON，并已作为主通道接入 DataCenter 双源扫描。
 
-> **隔离原则**：本服务独立于 DeepSeek Harness 插件进程运行，测试期默认只写入独立影子目录，**绝不触碰** iCloud `Health Data Export` 目录、DataCenter SQLite 数据库或 `dsh-3b-health/runtime/` 状态文件。
+> **隔离原则**：本服务独立于 DeepSeek Harness 插件进程运行，仅写入本地私有收件箱 `inbox/`，**绝不反写** iCloud `Health Data Export` 目录，也不直接读写 SQLite 数据库或 `dsh-3b-health/runtime/`。
 
 ## 目录与文件说明
 
 | 路径 | 说明 |
 | :--- | :--- |
 | `ingest/server.mjs` | 零外部依赖的本地 HTTP 接收服务（仅监听 `127.0.0.1:18765`） |
-| `ingest/init.mjs` | 初始化脚本：生成密钥配置、`staging/` 目录与 `launchd` 自启 plist |
-| `~/Library/Application Support/ThreeBody/HealthIngest/config.json` | 运行时配置与密钥（`0600` 权限，不入 Git） |
-| `~/Library/Application Support/ThreeBody/HealthIngest/staging/` | 测试期影子落盘目录（`0700` 权限） |
+| `ingest/init.mjs` | 初始化脚本：生成密钥配置、`inbox/` 目录与 `launchd` 自启 plist |
+| `~/Library/Application Support/ThreeBody/HealthIngest/config.json` | 运行时配置与密钥（`0600` 权限，不入 Git；`mode: "active-inbox"`） |
+| `~/Library/Application Support/ThreeBody/HealthIngest/inbox/` | 正式本地收件箱（`0700` 权限，由 DataCenter `local.datacenter.health` 每 5 分钟扫描） |
+| `~/Library/Application Support/ThreeBody/HealthIngest/staging/` | 历史影子测试期归档目录（不再写入） |
 | `~/Library/Application Support/ThreeBody/HealthIngest/ingest.log` | JSON Lines 审计日志（不记录 Token 与健康数据正文） |
 
 ## 安全防护（五层）
@@ -34,10 +35,13 @@ cd /Users/brucechen/Desktop/deepseek-harness/.plugin-dev/dsh-3b-health
 # 重新加载/重启服务（不覆盖 config.json 密钥）
 node ingest/init.mjs --install-launchd
 
+# 修改 config.json 后重启服务使其生效
+launchctl kickstart -k "gui/$(id -u)/local.health-ingest"
+
 # 查看监听状态与最近日志
 lsof -iTCP:18765 -sTCP:LISTEN
 tail -n 20 "$HOME/Library/Application Support/ThreeBody/HealthIngest/ingest.log"
-ls -lh "$HOME/Library/Application Support/ThreeBody/HealthIngest/staging"
+ls -lh "$HOME/Library/Application Support/ThreeBody/HealthIngest/inbox"
 ```
 
 ### Cloudflare 侧配置摘要
@@ -46,23 +50,16 @@ ls -lh "$HOME/Library/Application Support/ThreeBody/HealthIngest/staging"
 - **Tunnel**：`cloudflared` 以 macOS 系统 LaunchDaemon 运行（日志在 `/Library/Logs/com.cloudflare.cloudflared.err.log`），Public Hostname 转发 `k9x2.shutiaojun.cn/ingest/<随机串>` → **`HTTP`** `127.0.0.1:18765`（注意必须是 `HTTP` 而非 `HTTPS`）。
 - **WAF 边缘规则**：`Security → WAF → Custom rules` 中的 `block-non-health-webhook` 拦截所有不满足 `POST` + 精确路径 + `Authorization: Bearer <token>` 的请求。
 
-### iPhone HealthDataExport 配置（双轨并行测试期）
+### iPhone HealthDataExport 配置
 
-保留原有 iCloud 自动化不动，新增独立 Webhook 自动化：
 - **Export Options**：`JSON` / `Hourly` / `Webhook` / `Single File`
 - **URL**：`https://k9x2.shutiaojun.cn/ingest/<随机串>`
 - **Bearer token**：填入 `config.json` 中的 64 位 `token`（无需手动加 `Bearer ` 前缀）
 
-## 7 天验收与阶段 4 切换
+## 双源接入状态与一键回滚
 
-**切换前验收清单（全部通过再进入阶段 4）**：
-- [ ] **格式兼容**：比对同一天 `staging/RestExport_*.json` 与 iCloud `Automation______*.json` 的顶层结构、指标名、单位和 workouts，并用临时副本库验证 DataCenter 可正常解析。
-- [ ] **跨网送达率**：连续 7 天外网 5G / 非家庭 Wi-Fi 环境下均按时送达（如遇代理 TUN 下 QUIC 偶发断连，可为 `cloudflared` 增加 `--protocol http2`）。
-- [ ] **日志审计**：检查 `ingest.log` 与 Cloudflare Security Events，确认无异常写入。
-
-**阶段 4 切换与一键回滚**：
-- **切换**：不要将 `output_dir` 指向 iCloud 目录（避免 macOS 反向上传造成重复）。建议在 `local.datacenter.health` 中增加纯本地收件箱目录（或将 `staging/` 切为 `inbox/` 并由 DataCenter 扫描），双通道观察 3～7 天后再关闭 iPhone 上旧的 iCloud 自动化。
-- **一键回滚**：停掉本机 `launchd` 服务并在 Cloudflare 禁用对应 WAF/Tunnel 路由，旧 iCloud 链路全程未动，立即恢复：
+- **当前状态（2026-11-21 已切换）**：`HealthIngest` 已切换至 `inbox/`（`mode: "active-inbox"`），DataCenter（`scripts/sync_health_exports.py`）已支持同时扫描本地 `inbox/` 与原 iCloud `Health Data Export/`，并保留全部历史 `seen` 记录。观察 2～3 天稳定后，可在 iPhone 上关闭旧的 iCloud 自动化（历史文件无需删除）。
+- **一键回滚**：停掉本机 `launchd` 服务即可切回纯 iCloud 链路（原有 iCloud 自动化与历史记录全程未动）：
   ```bash
   launchctl bootout "gui/$(id -u)/local.health-ingest"
   ```
