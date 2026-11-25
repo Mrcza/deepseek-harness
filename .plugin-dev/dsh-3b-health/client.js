@@ -1164,6 +1164,12 @@ window.__ModuleLoader__.load({
           --3b-success: #2e6b4f;
           --3b-warn: #9b5a2e;
           --3b-error: #a33a2f;
+          /* 雷达图 5 档：优秀 → 需改善，明暗各一套，与 success/warn/error 同一色系。 */
+          --3b-tier-0: #2e6b4f;
+          --3b-tier-1: #4f7d5c;
+          --3b-tier-2: #9b7a2e;
+          --3b-tier-3: #b0662e;
+          --3b-tier-4: #a33a2f;
           --3b-mask: rgba(10, 10, 11, 0.45);
           --3b-code-bg: #0a0a0b;
           --3b-code-ink: #f1efea;
@@ -1194,6 +1200,11 @@ window.__ModuleLoader__.load({
           --3b-success: #7fbf9a;
           --3b-warn: #d9a76a;
           --3b-error: #e08a7d;
+          --3b-tier-0: #7fbf9a;
+          --3b-tier-1: #9cc7a6;
+          --3b-tier-2: #d4b06a;
+          --3b-tier-3: #d9a76a;
+          --3b-tier-4: #e08a7d;
           --3b-mask: rgba(0, 0, 0, 0.66);
           --3b-code-bg: #1a1714;
           --3b-code-ink: #ece2cf;
@@ -1708,6 +1719,175 @@ window.__ModuleLoader__.load({
           justify-content: flex-start;
         }
 
+        /* ===== 五维健康雷达 ===== */
+        .dsh-3b-radar-card {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding: 12px;
+        }
+        .dsh-3b-radar-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        }
+        .dsh-3b-radar-compare-select {
+          max-width: 110px;
+          height: 24px;
+          font-size: 10.5px;
+        }
+        .dsh-3b-radar-head h3 {
+          margin: 0;
+          font-family: var(--3b-serif);
+          font-size: 14px;
+          line-height: 20px;
+          font-weight: 500;
+        }
+        .dsh-3b-radar-svg {
+          display: block;
+          width: 100%;
+          height: auto;
+        }
+        .dsh-3b-radar-ring {
+          fill: none;
+          stroke: var(--3b-rule);
+          stroke-width: 1;
+        }
+        .dsh-3b-radar-ring.outer {
+          stroke: var(--3b-rule-strong);
+        }
+        .dsh-3b-radar-axis {
+          stroke: var(--3b-rule);
+          stroke-width: 1;
+        }
+        .dsh-3b-radar-axis-missing {
+          stroke: var(--3b-ink-4);
+          stroke-width: 1;
+          stroke-dasharray: 3 3;
+          opacity: 0.7;
+        }
+        .dsh-3b-radar-area {
+          stroke-width: 1.5;
+          transition: opacity 200ms ease;
+        }
+        /* 对比期轮廓：虚线、无填充，避免与今日轮廓抢视觉。 */
+        .dsh-3b-radar-compare {
+          fill: none;
+          stroke: var(--3b-ink-4);
+          stroke-width: 1.2;
+          stroke-dasharray: 4 3;
+          opacity: 0.75;
+        }
+        .dsh-3b-radar-compare-note {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 4px 10px;
+          margin: 0;
+          font-size: 10px;
+          line-height: 15px;
+          color: var(--3b-ink-3);
+        }
+        .dsh-3b-radar-legend-today::before,
+        .dsh-3b-radar-legend-past::before {
+          content: '';
+          display: inline-block;
+          width: 12px;
+          height: 0;
+          margin-right: 4px;
+          vertical-align: middle;
+        }
+        .dsh-3b-radar-legend-today::before {
+          border-top: 1.5px solid var(--3b-tier-1);
+        }
+        .dsh-3b-radar-legend-past::before {
+          border-top: 1.2px dashed var(--3b-ink-4);
+        }
+        .dsh-3b-radar-legend-delta {
+          font-family: var(--3b-mono);
+          font-variant-numeric: tabular-nums;
+          color: var(--3b-ink-4);
+        }
+        .dsh-3b-radar-area.dsh-3b-tier-fill-0 { fill: color-mix(in srgb, var(--3b-tier-0) 12%, transparent); stroke: var(--3b-tier-0); }
+        .dsh-3b-radar-area.dsh-3b-tier-fill-1 { fill: color-mix(in srgb, var(--3b-tier-1) 12%, transparent); stroke: var(--3b-tier-1); }
+        .dsh-3b-radar-area.dsh-3b-tier-fill-2 { fill: color-mix(in srgb, var(--3b-tier-2) 12%, transparent); stroke: var(--3b-tier-2); }
+        .dsh-3b-radar-area.dsh-3b-tier-fill-3 { fill: color-mix(in srgb, var(--3b-tier-3) 12%, transparent); stroke: var(--3b-tier-3); }
+        .dsh-3b-radar-area.dsh-3b-tier-fill-4 { fill: color-mix(in srgb, var(--3b-tier-4) 12%, transparent); stroke: var(--3b-tier-4); }
+        .dsh-3b-radar-dot.dsh-3b-tier-fill-0 { fill: var(--3b-tier-0); }
+        .dsh-3b-radar-dot.dsh-3b-tier-fill-1 { fill: var(--3b-tier-1); }
+        .dsh-3b-radar-dot.dsh-3b-tier-fill-2 { fill: var(--3b-tier-2); }
+        .dsh-3b-radar-dot.dsh-3b-tier-fill-3 { fill: var(--3b-tier-3); }
+        .dsh-3b-radar-dot.dsh-3b-tier-fill-4 { fill: var(--3b-tier-4); }
+        .dsh-3b-radar-label-name {
+          font-family: var(--3b-sans);
+          font-size: 10.5px;
+          fill: var(--3b-ink-3);
+        }
+        .dsh-3b-radar-label-score {
+          font-family: var(--3b-mono);
+          font-size: 9.5px;
+          font-variant-numeric: tabular-nums;
+          fill: var(--3b-ink-4);
+        }
+        .dsh-3b-radar-label.missing .dsh-3b-radar-label-name,
+        .dsh-3b-radar-label.missing .dsh-3b-radar-label-score {
+          fill: var(--3b-ink-4);
+          opacity: 0.65;
+        }
+        .dsh-3b-radar-label.carried .dsh-3b-radar-label-name,
+        .dsh-3b-radar-label.carried .dsh-3b-radar-label-score {
+          opacity: 0.7;
+        }
+        .dsh-3b-radar-gaps {
+          margin: 0;
+          padding: 8px 0 0;
+          list-style: none;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          border-top: 1px solid var(--3b-rule);
+        }
+        .dsh-3b-radar-gaps li {
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr);
+          gap: 8px;
+          font-size: 10px;
+          line-height: 14px;
+        }
+        .dsh-3b-radar-gap-domain {
+          color: var(--3b-ink-3);
+        }
+        .dsh-3b-radar-gap-text {
+          color: var(--3b-ink-2);
+          overflow-wrap: anywhere;
+        }
+        .dsh-3b-radar-note {
+          margin: 0;
+          font-size: 10px;
+          line-height: 15px;
+          color: var(--3b-ink-4);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .dsh-3b-radar-area {
+            transition: none;
+          }
+        }
+        .dsh-3b-status-pill.dsh-3b-tier-0 { color: var(--3b-tier-0); }
+        .dsh-3b-status-pill.dsh-3b-tier-1 { color: var(--3b-tier-1); }
+        .dsh-3b-status-pill.dsh-3b-tier-2 { color: var(--3b-tier-2); }
+        .dsh-3b-status-pill.dsh-3b-tier-3 { color: var(--3b-tier-3); }
+        .dsh-3b-status-pill.dsh-3b-tier-4 { color: var(--3b-tier-4); }
+        .dsh-3b-score-head {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 4px;
+        }
+        .dsh-3b-score-head h3 {
+          margin: 0;
+        }
+
         .dsh-3b-score-hero {
           display: flex;
           align-items: flex-start;
@@ -2084,6 +2264,10 @@ window.__ModuleLoader__.load({
           .dsh-3b-focus-grid {
             grid-template-columns: minmax(0, 1fr);
           }
+          /* 窄屏下域名可能换行，抬高画布避免标签压到多边形。 */
+          .dsh-3b-radar-svg {
+            min-height: 210px;
+          }
         }
       `
       const existing = document.getElementById(STYLE_ID)
@@ -2180,7 +2364,11 @@ window.__ModuleLoader__.load({
 
     const DEFAULT_PROFILE = { birth_year: 1992, sex: 'male', height_cm: 168 }
 
-    const FOCUS_DOMAIN_LABELS = ['体脂与体态', '睡眠与恢复', '运动与活动', '心肺与代谢', '肌肉与状态']
+    /* 评分口径版本：'legacy' 为旧的 PAS 四段式，'v2' 为连续曲线健康分。 */
+    const SCORING_VERSION = 'v2'
+
+    /* 六轴名称统一四字，雷达图上等长排布。 */
+    const FOCUS_DOMAIN_LABELS = ['体脂体态', '肌肉储备', '心肺适能', '日常活动', '睡眠恢复', '步态平衡']
 
     const FOCUS_ZONES = {
       athlete: { label: '运动员型', color: 'var(--3b-zone-athlete)' },
@@ -2213,6 +2401,108 @@ window.__ModuleLoader__.load({
       { id: 'deviation', label: '相对偏离优先', hint: '按超出健康边界的百分比排序，只列未达标指标' },
     ]
     const FOCUS_RULE_IDS = FOCUS_RULES.map((rule) => rule.id)
+
+    /* 五维雷达的 5 档分界：等距 80/60/40/20，正好落在 5 圈刻度 20/40/60/80/100 上，
+       因此「点落在哪一圈内」与「属于哪一档」严格一致。 */
+    const FOCUS_RADAR_TIERS = [
+      { id: 'excellent', label: '优秀', min: 80 },
+      { id: 'good', label: '良好', min: 60 },
+      { id: 'fair', label: '一般', min: 40 },
+      { id: 'poor', label: '待改善', min: 20 },
+      { id: 'critical', label: '需改善', min: 0 },
+    ]
+
+    /* ===== 连续评分曲线（v2） =====
+       单边指标：百分位 → 分数，锚点取自用户直觉（中位 70、90th=90、97th 起封顶 100）。
+       双边指标：区间位置 → 分数，中心 78、贴边 65，越界按指数衰减。
+       两条曲线都连续且单调，只在定义域两端做必要截断。 */
+
+    /** 单边指标的百分位锚点 [百分位, 分数]。 */
+    const FOCUS_PCT_ANCHORS = [
+      [0.00, 8], [0.05, 25], [0.10, 38], [0.25, 55],
+      [0.50, 70], [0.75, 81], [0.90, 90], [0.94, 95], [0.97, 100], [1.00, 100],
+    ]
+
+    /**
+     * Fritsch–Carlson 单调三次插值：保证曲线不过冲、不振荡，且严格单调。
+     * @param {Array<[number, number]>} points 递增的锚点
+     * @returns {(x: number) => number} 插值函数，定义域外取端点值
+     */
+    function focusPchip(points) {
+      const xs = points.map((point) => point[0])
+      const ys = points.map((point) => point[1])
+      const n = xs.length
+      const h = []
+      const d = []
+      for (let i = 0; i < n - 1; i += 1) {
+        h[i] = xs[i + 1] - xs[i]
+        d[i] = (ys[i + 1] - ys[i]) / h[i]
+      }
+      const m = new Array(n)
+      m[0] = d[0]
+      m[n - 1] = d[n - 2]
+      for (let i = 1; i < n - 1; i += 1) {
+        if (d[i - 1] * d[i] <= 0) {
+          m[i] = 0
+        } else {
+          const w1 = 2 * h[i] + h[i - 1]
+          const w2 = h[i] + 2 * h[i - 1]
+          m[i] = (w1 + w2) / (w1 / d[i - 1] + w2 / d[i])
+        }
+      }
+      return (x) => {
+        if (x <= xs[0]) return ys[0]
+        if (x >= xs[n - 1]) return ys[n - 1]
+        let i = 0
+        while (i < n - 2 && x > xs[i + 1]) i += 1
+        const t = (x - xs[i]) / h[i]
+        const t2 = t * t
+        const t3 = t2 * t
+        return (2 * t3 - 3 * t2 + 1) * ys[i]
+          + (t3 - 2 * t2 + t) * h[i] * m[i]
+          + (-2 * t3 + 3 * t2) * ys[i + 1]
+          + (t3 - t2) * h[i] * m[i + 1]
+      }
+    }
+
+    const focusPercentileCurve = focusPchip(FOCUS_PCT_ANCHORS)
+
+    /**
+     * 单边指标评分：把百分位换算成 0–100 健康分。
+     * @param {number | null} percentile 0–1 的百分位
+     * @returns {number} 健康分（越高越健康）
+     */
+    function focusPercentileScore(percentile) {
+      const value = focusNumber(percentile)
+      if (value === null) return 0
+      return focusPercentileCurve(Math.max(0, Math.min(1, value)))
+    }
+
+    /**
+     * 双边指标评分：按偏离区间中位的相对距离给分。
+     * 区间内 78 → 65（u 的三次方让区间内整体偏高），区间外指数衰减，两段在 u=1 处值与斜率连续。
+     * @param {number} u 偏离半宽的倍数，0 为区间正中，1 为边界
+     * @returns {number} 健康分（越高越健康）
+     */
+    function focusBandScore(u) {
+      const value = Math.max(0, focusNumber(u) || 0)
+      if (value <= 1) return 78 - 13 * value ** 3
+      return 65 * Math.exp(-0.6 * (value - 1))
+    }
+
+    /**
+     * 把 0–100 的健康分映射到 5 档之一。
+     * @param {number | null} score 健康分（越高越健康）
+     * @returns {number | null} 档位序号 0–4（0 为优秀），无有效分数时为 null
+     */
+    function focusRadarTierIndex(score) {
+      const value = focusNumber(score)
+      if (value === null) return null
+      for (let index = 0; index < FOCUS_RADAR_TIERS.length; index += 1) {
+        if (value >= FOCUS_RADAR_TIERS[index].min) return index
+      }
+      return FOCUS_RADAR_TIERS.length - 1
+    }
 
     function focusHomologyKey(card) {
       return FOCUS_HOMOLOGY[card.id] || card.id
@@ -2309,26 +2599,30 @@ window.__ModuleLoader__.load({
       return (wildcard ? picked.concat([wildcard]) : picked).sort((a, b) => b.pas - a.pas)
     }
 
+    /* 六轴指标表。domain 与 FOCUS_DOMAIN_LABELS 对应：
+       1 体脂体态 2 肌肉储备 3 心肺适能 4 日常活动 5 睡眠恢复 6 步态平衡。
+       scale 决定评分方式：'band' 用区间位置，'percentile' 用人群百分位。 */
     const FOCUS_METRICS = [
+      /* ---------- 1 体脂体态 ---------- */
       {
         id: 'body_fat',
         label: '体脂率',
         unit: '%',
         gapUnit: '%',
         domain: 1,
-        weight: 0.98,
+        weight: 1.0,
         kind: 'slow',
         precision: 1,
+        scale: 'band',
         source: 'Apple Health 同步的体脂率（秤端 BIA 实测），秤端原始导出值保留在悬浮气泡对比',
-        standard: 'Schutz et al., Int J Obes 2002 体成分参考区间',
+        standard: 'Gallagher et al., Am J Clin Nutr 2000 Table 4 健康区间',
         bounds(ctx) {
           const male = ctx.male
-          const bands = ctx.age < 40
-            ? (male ? [10, 20, 15] : [18, 28, 22])
-            : ctx.age < 60
-              ? (male ? [11, 22, 16.5] : [20, 30, 25])
-              : (male ? [13, 24, 18.5] : [22, 32, 27])
-          return { L: bands[0], U: bands[1], M: bands[2], margin: 5 }
+          const g = ctx.age < 40 ? 0 : ctx.age < 60 ? 1 : 2
+          const m = [[8, 20], [11, 22], [13, 25]]
+          const f = [[21, 33], [23, 34], [24, 36]]
+          const band = (male ? m : f)[g]
+          return { L: band[0], U: band[1], M: (band[0] + band[1]) / 2, margin: 6 }
         },
       },
       {
@@ -2337,9 +2631,10 @@ window.__ModuleLoader__.load({
         unit: 'kg/m²',
         gapUnit: '',
         domain: 1,
-        weight: 0.95,
+        weight: 0.7,
         kind: 'slow',
         precision: 1,
+        scale: 'band',
         source: '二次派生：最新体重 ÷ 身高的平方；秤端原始 BMI 只在悬浮气泡对比',
         standard: 'WS/T 428-2013《成人体重判定》',
         bounds(ctx) {
@@ -2354,9 +2649,10 @@ window.__ModuleLoader__.load({
         unit: 'kg/m²',
         gapUnit: '',
         domain: 1,
-        weight: 0.85,
+        weight: 0.5,
         kind: 'slow',
         precision: 1,
+        scale: 'band',
         source: '二次派生：脂肪量 ÷ 身高的平方',
         standard: 'Schutz et al., Int J Obes 2002 脂肪质量指数',
         bounds(ctx) {
@@ -2369,167 +2665,17 @@ window.__ModuleLoader__.load({
           return { L: bands[0], U: bands[1], M: bands[2], margin: 2 }
         },
       },
-      {
-        id: 'sleep',
-        label: '睡眠时长',
-        unit: '小时',
-        gapUnit: ' 小时/晚',
-        domain: 2,
-        weight: 0.96,
-        kind: 'daily',
-        precision: 2,
-        source: 'Apple Health 睡眠分析；健康导出按上海时区自然日归并，缺失日不补零',
-        standard: 'NSF / AASM-SRS 成人睡眠时长共识',
-        bounds(ctx) {
-          return ctx.age >= 65
-            ? { L: 7, U: 8, M: 7.5, margin: 1.5 }
-            : { L: 7, U: 9, M: 7.5, margin: 1.5 }
-        },
-      },
-      {
-        id: 'hrv',
-        label: '心率变异性',
-        unit: 'ms',
-        gapUnit: ' ms',
-        domain: 2,
-        weight: 0.85,
-        kind: 'daily',
-        precision: 1,
-        source: 'Apple Watch SDNN 心率变异性（健康导出）',
-        standard: 'AHA 自主神经恢复评估；群体下限与个人 30 日均值 85% 双轨',
-        bounds(ctx) {
-          const floor = ctx.age < 40 ? 30 : ctx.age < 60 ? 25 : 20
-          const mean30 = focusMeanOf(ctx, 'hrv')
-          const L = focusNumber(mean30) === null ? floor : Math.max(floor, mean30 * 0.85)
-          return { L, U: Infinity, M: mean30, margin: 12 }
-        },
-      },
-      {
-        id: 'weekly_exercise',
-        label: '周运动时长',
-        unit: '分钟',
-        gapUnit: ' 分钟/周',
-        domain: 3,
-        weight: 0.94,
-        kind: 'daily',
-        precision: 1,
-        source: 'Health Data Export 训练明细（workouts）近 7 日累计分钟，不与 Apple 活动汇总相加',
-        standard: 'WHO 2020 身体活动指南 / AHA 成人运动建议',
-        bounds() {
-          return { L: 150, U: 300, M: 210, margin: 90 }
-        },
-      },
-      {
-        id: 'steps',
-        label: '日均步数',
-        unit: '步',
-        gapUnit: ' 步/天',
-        domain: 3,
-        weight: 0.86,
-        kind: 'daily',
-        precision: 0,
-        source: 'Apple Health 步数（单日单来源，避免设备重复计数）',
-        standard: 'Tudor-Locke 步数分级 / Paluch 步数与死亡率 Meta 分析',
-        bounds(ctx) {
-          return ctx.age >= 60
-            ? { L: 6000, U: 10000, M: 8000, margin: 2000 }
-            : { L: 7000, U: 12000, M: 8500, margin: 2500 }
-        },
-      },
-      {
-        id: 'daylight',
-        label: '日照时间',
-        unit: '分钟',
-        gapUnit: ' 分钟/天',
-        domain: 3,
-        weight: 0.72,
-        kind: 'daily',
-        precision: 1,
-        source: 'Apple Health 日照时间（户外光照暴露）',
-        standard: '昼夜节律与户外日照公共卫生建议',
-        bounds() {
-          return { L: 30, U: 180, M: 60, margin: 20 }
-        },
-      },
-      {
-        id: 'vo2max',
-        label: '最大摄氧量',
-        unit: 'mL/min·kg',
-        gapUnit: '',
-        domain: 4,
-        weight: 0.92,
-        kind: 'slow',
-        precision: 1,
-        source: 'Apple Health 最大摄氧量（FRIEND 百分位口径）',
-        standard: 'FRIEND Registry 心肺耐力标准 / AHA 声明',
-        bounds(ctx) {
-          const male = ctx.male
-          const bands = male
-            ? [[30, 41], [40, 38], [50, 35], [60, 31], [999, 27]]
-            : [[30, 31], [40, 28], [50, 25], [60, 22], [999, 19]]
-          let L = bands[bands.length - 1][1]
-          for (const band of bands) {
-            if (ctx.age < band[0]) { L = band[1]; break }
-          }
-          return { L, U: Infinity, M: L + (male ? 4 : 3.5), margin: 6 }
-        },
-      },
-      {
-        id: 'resting_hr',
-        label: '静息心率',
-        unit: 'bpm',
-        gapUnit: ' bpm',
-        domain: 4,
-        weight: 0.9,
-        kind: 'daily',
-        precision: 1,
-        source: 'Apple Watch 静息心率（7 个完结日有效均值）',
-        standard: '静息心率与心血管预后队列研究（临床上限 80 bpm）',
-        bounds(ctx) {
-          const mean30 = focusMeanOf(ctx, 'resting_hr')
-          const ceiling = focusNumber(mean30) === null ? 75 : Math.min(75, mean30 + 5)
-          return { L: 50, U: ceiling, M: 61, margin: 10 }
-        },
-      },
-      {
-        id: 'oxygen',
-        label: '血氧饱和度',
-        unit: '%',
-        gapUnit: '%',
-        domain: 4,
-        weight: 0.9,
-        kind: 'daily',
-        precision: 1,
-        source: 'Apple Watch 血氧饱和度（脉搏血氧）',
-        standard: '临床脉搏血氧饱和度标准范围',
-        bounds() {
-          return { L: 95, U: 100, M: 97.5, margin: 3 }
-        },
-      },
-      {
-        id: 'respiratory_rate',
-        label: '呼吸频率',
-        unit: '次/分',
-        gapUnit: ' 次/分',
-        domain: 4,
-        weight: 0.8,
-        kind: 'daily',
-        precision: 1,
-        source: '睡眠期间呼吸频率',
-        standard: '成人静息/睡眠呼吸频率标准范围',
-        bounds() {
-          return { L: 12, U: 20, M: 14, margin: 4 }
-        },
-      },
+      /* ---------- 2 肌肉储备 ---------- */
       {
         id: 'derived_ffmi',
         label: '去脂指数 FFMI',
         unit: 'kg/m²',
         gapUnit: '',
-        domain: 5,
-        weight: 0.88,
+        domain: 2,
+        weight: 0.6,
         kind: 'slow',
         precision: 1,
+        scale: 'band',
         source: '二次派生：去脂体重 ÷ 身高的平方',
         standard: 'Schutz et al. 2002 / Kudsk NHANES III 分层标准',
         bounds(ctx) {
@@ -2541,19 +2687,224 @@ window.__ModuleLoader__.load({
         },
       },
       {
+        id: 'lean_body_mass',
+        label: '去脂体重',
+        unit: 'kg',
+        gapUnit: ' kg',
+        domain: 2,
+        weight: 0.5,
+        kind: 'slow',
+        precision: 1,
+        scale: 'band',
+        source: 'Apple Health 体成分同步的去脂体重',
+        standard: 'FFMI 健康区间换算的去脂体重（男 17.5–22.5 / 女 15–18.5 kg/m²）',
+        bounds(ctx) {
+          /* 用 FFMI 健康区间换算，避免直接拿 21.5 当去脂体重下限（那是 FFMI 不是 LBM）。 */
+          const lo = (ctx.male ? 17.5 : 15) * ctx.heightSq
+          const hi = (ctx.male ? 22.5 : 18.5) * ctx.heightSq
+          return { L: lo, U: hi, M: (lo + hi) / 2, margin: lo * 0.12 }
+        },
+      },
+      {
         id: 'derived_bmr',
         label: '去脂基础代谢',
         unit: 'kcal',
         gapUnit: ' kcal',
-        domain: 5,
-        weight: 0.8,
+        domain: 2,
+        weight: 0.4,
         kind: 'slow',
         precision: 0,
+        scale: 'band',
         source: '二次派生：Katch-McArdle / Cunningham 370 + 21.6 × 去脂体重',
         standard: 'Katch-McArdle 去脂代谢方程（保肌代谢护栏）',
         bounds(ctx) {
-          const L = ctx.male ? 21.5 * ctx.heightSq * 24 : 19.5 * ctx.heightSq * 22
-          return { L, U: Infinity, M: null, margin: 200 }
+          const floor = (ctx.male ? 21.5 : 19.5) * ctx.heightSq * 24
+          return { L: floor, U: floor * 1.8, M: floor * 1.25, margin: 200 }
+        },
+      },
+      /* ---------- 3 心肺适能 ---------- */
+      {
+        id: 'vo2max',
+        label: '最大摄氧量',
+        unit: 'mL/min·kg',
+        gapUnit: '',
+        domain: 3,
+        weight: 1.0,
+        kind: 'slow',
+        precision: 1,
+        scale: 'percentile',
+        source: 'Apple Health 最大摄氧量（FRIEND 百分位口径）',
+        standard: 'FRIEND Registry（Kaminsky et al., Mayo Clin Proc 2022）年龄性别百分位',
+        bounds(ctx) {
+          const bands = ctx.male
+            ? [[30, 41], [40, 38], [50, 35], [60, 31], [999, 27]]
+            : [[30, 31], [40, 28], [50, 25], [60, 22], [999, 19]]
+          let L = bands[bands.length - 1][1]
+          for (const band of bands) {
+            if (ctx.age < band[0]) { L = band[1]; break }
+          }
+          return { L, U: Infinity, M: L + (ctx.male ? 4 : 3.5), margin: 6 }
+        },
+      },
+      {
+        id: 'resting_hr',
+        label: '静息心率',
+        unit: 'bpm',
+        gapUnit: ' bpm',
+        domain: 3,
+        weight: 0.7,
+        kind: 'daily',
+        precision: 1,
+        scale: 'band',
+        source: 'Apple Watch 静息心率（7 个完结日有效均值）',
+        standard: '静息心率与心血管预后队列研究（临床上限 80 bpm）',
+        bounds(ctx) {
+          const mean30 = focusMeanOf(ctx, 'resting_hr')
+          const ceiling = focusNumber(mean30) === null ? 75 : Math.min(75, mean30 + 5)
+          return { L: 50, U: ceiling, M: 61, margin: 10 }
+        },
+      },
+      /* ---------- 4 日常活动 ---------- */
+      {
+        id: 'steps',
+        label: '日均步数',
+        unit: '步',
+        gapUnit: ' 步/天',
+        domain: 4,
+        weight: 0.9,
+        kind: 'daily',
+        precision: 0,
+        scale: 'band',
+        source: 'Apple Health 步数（单日单来源，避免设备重复计数）',
+        standard: 'Paluch et al., Lancet Public Health 2022 步数与死亡率封顶值',
+        bounds(ctx) {
+          const cap = ctx.age >= 60 ? 8000 : 10000
+          const floor = ctx.age >= 60 ? 6000 : 7000
+          return { L: floor, U: cap, M: (floor + cap) / 2, margin: 2500 }
+        },
+      },
+      {
+        id: 'weekly_exercise',
+        label: '周运动时长',
+        unit: '分钟',
+        gapUnit: ' 分钟/周',
+        domain: 4,
+        weight: 0.7,
+        kind: 'daily',
+        precision: 1,
+        scale: 'band',
+        source: 'Health Data Export 训练明细（workouts）近 7 日累计分钟，不与 Apple 活动汇总相加',
+        standard: 'WHO 2020 身体活动指南 / AHA 成人运动建议',
+        bounds() {
+          return { L: 150, U: 300, M: 210, margin: 90 }
+        },
+      },
+      {
+        id: 'stand_time',
+        label: '站立时间',
+        unit: '分钟',
+        gapUnit: ' 分钟/天',
+        domain: 4,
+        weight: 0.4,
+        kind: 'daily',
+        precision: 0,
+        scale: 'band',
+        source: 'Apple Watch 站立时间（久坐行为的代理指标）',
+        standard: '久坐行为与全因死亡率研究（每日站立 ≥180 分钟）',
+        bounds() {
+          return { L: 120, U: 300, M: 200, margin: 60 }
+        },
+      },
+      /* ---------- 5 睡眠恢复 ---------- */
+      {
+        id: 'sleep',
+        label: '睡眠时长',
+        unit: '小时',
+        gapUnit: ' 小时/晚',
+        domain: 5,
+        weight: 0.9,
+        kind: 'daily',
+        precision: 2,
+        scale: 'band',
+        source: 'Apple Health 睡眠分析；健康导出按上海时区自然日归并，缺失日不补零',
+        standard: 'AASM / SRS 2015 成人睡眠时长共识（7–9 小时）',
+        bounds(ctx) {
+          return ctx.age >= 65
+            ? { L: 7, U: 8, M: 7.5, margin: 1.5 }
+            : { L: 7, U: 9, M: 8, margin: 1.5 }
+        },
+      },
+      {
+        id: 'hrv',
+        label: '心率变异性',
+        unit: 'ms',
+        gapUnit: ' ms',
+        domain: 5,
+        weight: 0.5,
+        kind: 'daily',
+        precision: 1,
+        scale: 'percentile',
+        source: 'Apple Watch SDNN 心率变异性（健康导出）',
+        standard: 'Voss et al., PLOS ONE 2015 KORA S4 年龄性别参考值',
+        bounds(ctx) {
+          const mean30 = focusMeanOf(ctx, 'hrv')
+          const L = focusNumber(mean30) === null ? (ctx.age < 40 ? 30 : ctx.age < 60 ? 25 : 20) : Math.max(20, mean30 * 0.85)
+          return { L, U: Infinity, M: mean30, margin: 12 }
+        },
+      },
+      /* ---------- 6 步态平衡 ---------- */
+      {
+        id: 'walking_speed',
+        label: '步行速度',
+        unit: 'm/s',
+        gapUnit: ' m/s',
+        domain: 6,
+        weight: 0.8,
+        kind: 'daily',
+        precision: 2,
+        scale: 'percentile',
+        source: 'Apple Health 步行速度（户外步行平均）',
+        standard: 'McKay et al. 社区健康成人步速参考值（年龄性别分层）',
+        bounds(ctx) {
+          const male = ctx.male
+          const g = ctx.age < 30 ? 0 : ctx.age < 40 ? 1 : ctx.age < 50 ? 2 : ctx.age < 60 ? 3 : ctx.age < 70 ? 4 : 5
+          const m = [[1.18, 0.20], [1.21, 0.21], [1.21, 0.24], [1.16, 0.20], [1.16, 0.22], [1.07, 0.24]]
+          const f = [[1.11, 0.20], [1.15, 0.20], [1.14, 0.23], [1.15, 0.22], [1.05, 0.22], [0.99, 0.22]]
+          const band = (male ? m : f)[g]
+          return { L: band[0] - band[1], U: band[0] + band[1], M: band[0], margin: band[1] }
+        },
+      },
+      {
+        id: 'walking_asymmetry',
+        label: '步行不对称性',
+        unit: '%',
+        gapUnit: '%',
+        domain: 6,
+        weight: 0.4,
+        kind: 'daily',
+        precision: 1,
+        scale: 'band',
+        source: 'Apple Health 步行不对称性（左右步态差异百分比）',
+        standard: '步态对称性研究（>5% 提示异常）',
+        bounds() {
+          return { L: 0, U: 3, M: 1.5, margin: 4 }
+        },
+      },
+      {
+        id: 'double_support',
+        label: '双支撑相',
+        unit: '%',
+        gapUnit: '%',
+        domain: 6,
+        weight: 0.3,
+        kind: 'daily',
+        precision: 1,
+        scale: 'band',
+        source: 'Apple Health 双支撑相占比（步态稳定性，导出为 0–1 小数）',
+        standard: '步态稳定性研究（成人正常约 20–30%）',
+        bounds() {
+          /* 原始导出是 0–1 的小数，这里统一按小数区间评分。 */
+          return { L: 0.18, U: 0.30, M: 0.24, margin: 0.08 }
         },
       },
     ]
@@ -2838,6 +3189,59 @@ window.__ModuleLoader__.load({
       }
     }
 
+    /**
+     * 计算单项指标的评分。
+     * v2 口径按 scale 走连续曲线：percentile 用人群百分位，band 用区间位置；
+     * legacy 口径保留原 PAS 四段式（dev/trend/persist/baseline），供随时切回。
+     * @param {object} def 指标定义
+     * @param {object} ctx 计算上下文
+     * @param {object} value focusResolveValue 的结果
+     * @returns {object} 含 pas（0–100，越高越需关注）、score（0–100，越高越健康）、档位与差距
+     */
+    /* ===== v2 评分的两个换算器 ===== */
+
+    /** 正态分布 CDF 的数值近似（Abramowitz–Stegun），用于 z 值转百分位。 */
+    function focusNormalCdf(z) {
+      const t = 1 / (1 + 0.2316419 * Math.abs(z))
+      const d = 0.3989423 * Math.exp(-z * z / 2)
+      const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))))
+      return z > 0 ? 1 - p : p
+    }
+
+    /**
+     * 把指标实测值换算成人群百分位（0–1）。
+     * 单边指标按年龄性别参考均值与标准差做 z 值换算；无参考表时退回区间位置。
+     * @param {object} def 指标定义
+     * @param {object} ctx 计算上下文
+     * @param {number} x 实测值
+     * @returns {number} 0–1 的百分位
+     */
+    function focusMetricPercentile(def, ctx, x) {
+      const bounds = def.bounds(ctx)
+      const mean = focusNumber(bounds.M)
+      const sd = focusNumber(bounds.margin)
+      if (mean === null || sd === null || sd <= 0) return focusBandPosition(bounds, x)
+      return focusNormalCdf((x - mean) / sd)
+    }
+
+    /**
+     * 把实测值换算成偏离区间中位的相对距离。
+     * 区间内按半宽归一化（0 为正中、1 为边界），越界后按 margin 继续外推。
+     * @param {object} bounds 指标的 L/U/M/margin
+     * @param {number} x 实测值
+     * @returns {number} u 值，0 起递增
+     */
+    function focusBandPosition(bounds, x) {
+      const L = bounds.L
+      const U = bounds.U
+      const M = focusNumber(bounds.M)
+      const margin = focusNumber(bounds.margin) || 1
+      const center = M === null ? (Number.isFinite(L) && Number.isFinite(U) ? (L + U) / 2 : L) : M
+      const half = Number.isFinite(L) && Number.isFinite(U) ? Math.max(1e-9, (U - L) / 2) : margin
+      if (x >= L && x <= U) return Math.abs(x - center) / half
+      const dist = x > U ? x - U : L - x
+      return 1 + dist / margin
+    }
     function focusScore(def, ctx, value) {
       const bounds = def.bounds(ctx)
       const stats = ctx.stats.get(def.id) || { mean30: null, sd30: null, slope: null }
@@ -2845,6 +3249,32 @@ window.__ModuleLoader__.load({
       const L = bounds.L
       const U = bounds.U
       const ideal = focusNumber(bounds.M)
+      const gapDays = value.lastIndex >= 0 ? (ctx.matrix.len - 1 - value.lastIndex) : 999
+      const fresh = def.kind === 'daily' && gapDays > 14 ? 0.2 : 1
+      const status = x > U ? '偏高' : x < L ? '不足' : '标准'
+      const gap = x > U ? x - U : x < L ? L - x : 0
+      const dir = x > U ? 'down' : x < L ? 'up' : 'flat'
+
+      if (SCORING_VERSION === 'v2') {
+        const score = def.scale === 'percentile'
+          ? focusPercentileScore(focusMetricPercentile(def, ctx, x))
+          : focusBandScore(focusBandPosition(bounds, x))
+        /* PAS 语义反转为「关注度」，便于沿用既有的排序与文案。 */
+        const pas = Math.round(100 - Math.max(0, Math.min(100, score)))
+        return {
+          bounds,
+          stats,
+          fresh,
+          score,
+          pas,
+          status,
+          gap,
+          dir,
+          scale: def.scale,
+          percentile: def.scale === 'percentile' ? focusMetricPercentile(def, ctx, x) : null,
+        }
+      }
+
       let dev
       if (x > U) dev = Math.min(1.5, 0.35 + 0.65 * (x - U) / bounds.margin)
       else if (x < L) dev = Math.min(1.5, 0.35 + 0.65 * (L - x) / bounds.margin)
@@ -2884,12 +3314,8 @@ window.__ModuleLoader__.load({
         ? Math.abs((x - mean30) / sd30)
         : 0
       const baseline = Math.min(1, Math.max(0, (z - 0.8) / 1.5))
-      const gapDays = value.lastIndex >= 0 ? (ctx.matrix.len - 1 - value.lastIndex) : 999
-      const fresh = def.kind === 'daily' && gapDays > 14 ? 0.2 : 1
       const raw = def.weight * (0.55 * dev + 0.2 * trend + 0.15 * persist + 0.1 * baseline) * fresh
       const pas = Math.round(100 * Math.min(1, Math.max(0, raw)))
-      const status = x > U ? '偏高' : x < L ? '不足' : '标准'
-      const gap = x > U ? x - U : x < L ? L - x : 0
       return {
         bounds,
         stats,
@@ -2898,10 +3324,13 @@ window.__ModuleLoader__.load({
         persist,
         baseline,
         fresh,
+        score: 100 - pas,
         pas,
         status,
         gap,
-        dir: x > U ? 'down' : x < L ? 'up' : 'flat',
+        dir,
+        scale: 'legacy',
+        percentile: null,
       }
     }
 
@@ -2926,6 +3355,73 @@ window.__ModuleLoader__.load({
       const row = bmi >= 24 ? 0 : bmi >= 18.5 ? 1 : 2
       const col = bodyFat < x1 ? 0 : bodyFat <= x2 ? 1 : 2
       return { key: table[row][col], row, col }
+    }
+
+    /**
+     * 按生理域聚合出雷达图的 5 条轴。
+     * 域分 = 100 − 域内各项按 weight 加权平均的 PAS；只让有有效取值的指标参与，分母随缺失收缩。
+     * 域态三态：整域无有效指标记 missing，全部取自窗口内最近实测记 carried，否则 fresh。
+     * @param {Array<{def: object, value: object, score: object}>} scored 有有效取值的指标条目
+     * @param {Array<object>} cards 同顺序的侧栏卡片（含短板的展示字段）
+     * @returns {object} 雷达模型：axes、usableCount、staleNote、carriedNote
+     */
+    function focusRadarModel(scored, cards) {
+      const axes = []
+      for (let domain = 1; domain <= FOCUS_DOMAIN_LABELS.length; domain += 1) {
+        const entries = scored.filter((entry) => entry.def.domain === domain)
+        const label = FOCUS_DOMAIN_LABELS[domain - 1]
+        if (entries.length === 0) {
+          axes.push({
+            domain,
+            label,
+            score: null,
+            tier: null,
+            tierIndex: null,
+            state: 'missing',
+            shortfall: null,
+            carriedDate: null,
+            members: [],
+          })
+          continue
+        }
+        const weightSum = entries.reduce((sum, entry) => sum + entry.def.weight, 0)
+        const scoreSum = entries.reduce((sum, entry) => sum + entry.def.weight * entry.score.score, 0)
+        const score = weightSum > 0 ? Math.round(scoreSum / weightSum) : null
+        const tierIndex = focusRadarTierIndex(score)
+        const allCarried = entries.every((entry) => entry.value.fallback === true)
+        const carriedEntry = entries
+          .filter((entry) => entry.value.fallback === true)
+          .sort((a, b) => (a.value.lastDate < b.value.lastDate ? 1 : -1))[0]
+        /* 短板只列未达标的指标：域内各项都标准时不编造短板。 */
+        const worst = entries.slice().sort((a, b) => b.score.pas - a.score.pas)[0]
+        const worstCard = worst.score.status === '标准' ? null : cards.find((card) => card.id === worst.def.id)
+        axes.push({
+          domain,
+          label,
+          score,
+          tier: tierIndex === null ? null : FOCUS_RADAR_TIERS[tierIndex].label,
+          tierIndex,
+          state: allCarried ? 'carried' : 'fresh',
+          shortfall: worstCard
+            ? { id: worstCard.id, label: worstCard.label, valueText: worstCard.valueText, unit: worstCard.unit, status: worstCard.status, pas: worstCard.pas }
+            : null,
+          carriedDate: carriedEntry ? carriedEntry.value.lastDate : null,
+          members: entries.map((entry) => entry.def.label),
+        })
+      }
+      const usable = axes.filter((axis) => axis.score !== null)
+      const missingLabels = axes.filter((axis) => axis.state === 'missing').map((axis) => axis.label)
+      const carriedLabels = axes
+        .filter((axis) => axis.state === 'carried')
+        .map((axis) => axis.label + '沿用 ' + String(axis.carriedDate || '').slice(5) + ' 实测')
+      return {
+        axes,
+        usableCount: usable.length,
+        staleNote: missingLabels.length
+          ? missingLabels.join('、') + '暂无数据，未计入平均'
+          : null,
+        carriedNote: carriedLabels.length ? carriedLabels.join('；') : null,
+      }
     }
 
     function focusBodyGrid(matrix, profile) {
@@ -2990,7 +3486,33 @@ window.__ModuleLoader__.load({
       }
     }
 
-    function evaluateHealthFocus(healthData, checkinsData, profile, ruleId) {
+    /**
+     * 从历史归档里挑出最接近「资料日往前 N 天」的一条记录作为对比期。
+     * @param {Array<object>} history 按日期升序的归档
+     * @param {string} windowEnd 当前资料日 YYYY-MM-DD
+     * @param {number} days 对比天数
+     * @returns {{row: object, date: string} | null} 命中的记录，历史不足时为 null
+     */
+    function focusCompareFromHistory(history, windowEnd, days) {
+      if (!Array.isArray(history) || history.length === 0 || !windowEnd) return null
+      const end = Date.parse(windowEnd + 'T00:00:00Z')
+      if (!Number.isFinite(end)) return null
+      const target = end - days * 86400000
+      let best = null
+      let bestGap = Infinity
+      for (const row of history) {
+        if (!row || typeof row.date !== 'string' || row.date >= windowEnd) continue
+        const at = Date.parse(row.date + 'T00:00:00Z')
+        if (!Number.isFinite(at)) continue
+        const gap = Math.abs(at - target)
+        if (gap < bestGap) { best = row; bestGap = gap }
+      }
+      /* 允许 ±3 天误差，否则说明归档还没攒够。 */
+      if (!best || bestGap > 3 * 86400000) return null
+      return { row: best, date: best.date }
+    }
+
+    function evaluateHealthFocus(healthData, checkinsData, profile, ruleId, radarHistory, compareDays) {
       const clean = focusProfileClean(profile)
       const age = focusAgeOf(clean)
       const male = clean.sex === 'male'
@@ -3002,6 +3524,9 @@ window.__ModuleLoader__.load({
         rules: FOCUS_RULES,
         targets: [],
         score: null,
+        scoreTier: null,
+        scoreTierIndex: null,
+        radar: null,
         advice: '',
         grid: null,
         values: {},
@@ -3163,6 +3688,8 @@ window.__ModuleLoader__.load({
           domainLabel: FOCUS_DOMAIN_LABELS[def.domain - 1],
           weight: def.weight,
           pas: score.pas,
+          score: Math.round(score.score),
+          tier: focusRadarTierIndex(score.score) === null ? null : FOCUS_RADAR_TIERS[focusRadarTierIndex(score.score)].label,
           status: score.status,
           tone: score.status === '标准' ? 'good' : 'warn',
           valueText,
@@ -3196,13 +3723,27 @@ window.__ModuleLoader__.load({
         scored.push({ def, value: resolved, score: focusScore(def, ctx, resolved) })
       }
       const cards = scored.map(cardFor).sort((a, b) => b.pas - a.pas)
+      /* 雷达图固定输出 5 条轴（域 1–5），某域无任何有效指标时该轴记 missing，不补 0。 */
+      const radar = focusRadarModel(scored, cards)
+      /* 叠加对比期：从历史归档里取最近一条与「资料日往前 compareDays 天」最接近的记录。 */
+      const compareWindowDays = compareDays === 30 ? 30 : 15
+      const windowEndDate = matrix.window[matrix.len - 1]
+      const compareHit = focusCompareFromHistory(radarHistory, windowEndDate, compareWindowDays)
+      radar.compareDays = compareWindowDays
+      radar.compareDate = compareHit ? compareHit.date : null
+      radar.compareMissing = !compareHit
+      radar.compare = compareHit && Array.isArray(compareHit.row.axes)
+        ? compareHit.row.axes.map((value) => ({ score: typeof value === 'number' ? value : null }))
+        : null
+      radar.compareComposite = compareHit && typeof compareHit.row.composite === 'number' ? compareHit.row.composite : null
       const focusRule = FOCUS_RULE_IDS.indexOf(String(ruleId)) >= 0 ? String(ruleId) : 'domain'
       const top = focusSelectCards(cards, focusRule)
-      /* 综合评分固定按分域保底口径计算，切换显示规则不改变分数；建议文案跟随当前卡片。 */
-      const scoreCards = focusRule === 'domain' ? top : focusSelectCards(cards, 'domain')
-      const weightSum = scoreCards.reduce((sum, card) => sum + card.weight, 0)
-      const pasSum = scoreCards.reduce((sum, card) => sum + card.weight * card.pas, 0)
-      const score = scoreCards.length > 0 && weightSum > 0 ? Math.round(100 - 35 * (pasSum / weightSum) / 100) : null
+      /* 综合评分按全部指标加权，取全量 0–100：与雷达图同一把尺子，但雷达是它的分域展开，
+         两者口径不同、数值接近而不保证相等。切换选卡规则不改变分数；建议文案跟随当前卡片。 */
+      const weightSum = cards.reduce((sum, card) => sum + card.weight, 0)
+      const scoreSum = cards.reduce((sum, card) => sum + card.weight * card.score, 0)
+      const score = cards.length > 0 && weightSum > 0 ? Math.round(scoreSum / weightSum) : null
+      const scoreTierIndex = focusRadarTierIndex(score)
       const improving = top.filter((card) => card.status !== '标准').slice(0, 2)
       const guardCandidates = top.filter((card) => card.status === '标准')
       const guard = guardCandidates.find((card) => card.id === 'derived_ffmi' || card.id === 'derived_bmr')
@@ -3319,6 +3860,9 @@ window.__ModuleLoader__.load({
         rules: FOCUS_RULES,
         targets,
         score,
+        scoreTier: scoreTierIndex === null ? null : FOCUS_RADAR_TIERS[scoreTierIndex].label,
+        scoreTierIndex,
+        radar,
         advice,
         grid: focusBodyGrid(matrix, clean),
         values: {
@@ -4685,7 +5229,25 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { className: 'dsh-3b-score-body' },
-          h('h3', null, '综合健康评分'),
+          h(
+            'div',
+            { className: 'dsh-3b-score-head' },
+            h('h3', null, '综合健康评分'),
+            model.scoreTier && h(
+              'span',
+              { className: 'dsh-3b-status-pill dsh-3b-tier-' + model.scoreTierIndex },
+              model.scoreTier,
+            ),
+            h(FocusBang, {
+              title: '综合健康评分',
+              rows: [
+                { label: '计算口径', text: '全部 14 项指标按权重加权平均 PAS 关注分，再用 100 减去该均值，取 0–100 全量刻度。' },
+                { label: '与雷达图', text: '雷达五轴是同一批指标的分域展开，两者口径不同：域分先按域内加权、再对五个域取数，综合分直接对全部指标加权，数值接近但不保证相等。' },
+                { label: '选卡规则', text: '右上角的选卡规则只改变「重点关注」显示哪几张卡，不改变本分数。' },
+                { label: '分档', text: '优秀 ≥80、良好 ≥60、一般 ≥40、待改善 ≥20、需改善 <20。' },
+              ],
+            }),
+          ),
           h('p', null, model.advice),
           model.truncated && h('p', { className: 'dsh-3b-score-note' }, '当日数据尚未完结，日均类指标取最近 7 个完结日。'),
         ),
@@ -4718,6 +5280,193 @@ window.__ModuleLoader__.load({
           card.gapText,
           card.actionText && h('span', { className: 'dsh-3b-focus-action' }, ' · ' + card.actionText),
         ),
+      )
+    }
+
+    /* 六维雷达：轴数跟随 FOCUS_DOMAIN_LABELS，从正上方开始顺时针均分。 */
+    const RADAR_WIDTH = 340
+    const RADAR_HEIGHT = 300
+    const RADAR_CENTER = { x: 170, y: 142 }
+    const RADAR_RADIUS = 78
+    const RADAR_RINGS = [20, 40, 60, 80, 100]
+    const RADAR_AXIS_COUNT = FOCUS_DOMAIN_LABELS.length
+
+    function radarPoint(index, ratio) {
+      const angle = (-90 + index * (360 / RADAR_AXIS_COUNT)) * (Math.PI / 180)
+      return {
+        x: RADAR_CENTER.x + Math.cos(angle) * RADAR_RADIUS * ratio,
+        y: RADAR_CENTER.y + Math.sin(angle) * RADAR_RADIUS * ratio,
+      }
+    }
+
+    function radarPolygon(ratio) {
+      return Array.from({ length: RADAR_AXIS_COUNT }, (_, index) => {
+        const point = radarPoint(index, ratio)
+        return point.x.toFixed(2) + ',' + point.y.toFixed(2)
+      }).join(' ')
+    }
+
+    /** 把一组分数转成多边形顶点字符串；缺失轴不参与连线。 */
+    function radarScorePoints(axes, scores) {
+      const indices = axes.map((axis, index) => (scores[index] === null || scores[index] === undefined ? -1 : index))
+        .filter((index) => index >= 0)
+      if (indices.length < 3) return ''
+      return indices.map((index) => {
+        const point = radarPoint(index, Math.max(0, Math.min(100, scores[index])) / 100)
+        return point.x.toFixed(2) + ',' + point.y.toFixed(2)
+      }).join(' ')
+    }
+
+    function HealthRadarCard({ model, compareDays, onChangeCompareDays, compareBusy }) {
+      const radar = model && model.radar
+      if (!radar || !Array.isArray(radar.axes) || radar.usableCount === 0) {
+        return h(
+          'section',
+          { className: 'dsh-3b-card dsh-3b-radar-card' },
+          h('div', { className: 'dsh-3b-radar-head' }, h('h3', null, '六维健康雷达')),
+          h('p', { className: 'dsh-3b-empty' }, '暂无足够数据生成健康雷达图'),
+        )
+      }
+      const axes = radar.axes
+      const overallTier = focusRadarTierIndex(model.score)
+      const polygonPoints = radarScorePoints(axes, axes.map((axis) => axis.score))
+      /* 对比期轮廓：来自历史归档，缺失时整条不画。 */
+      const compareScores = Array.isArray(radar.compare) ? radar.compare.map((item) => item.score) : null
+      const comparePoints = compareScores ? radarScorePoints(axes, compareScores) : ''
+      const labelNodes = []
+      const vertexNodes = []
+      for (let index = 0; index < axes.length; index += 1) {
+        const axis = axes[index]
+        const outer = radarPoint(index, 1)
+        const anchorRatio = 1.2
+        const anchor = radarPoint(index, anchorRatio)
+        const dx = anchor.x - RADAR_CENTER.x
+        const textAnchor = Math.abs(dx) < 6 ? 'middle' : dx > 0 ? 'start' : 'end'
+        const stateClass = axis.state === 'missing' ? ' missing' : axis.state === 'carried' ? ' carried' : ''
+        labelNodes.push(h(
+          'g',
+          { key: 'label-' + axis.domain, className: 'dsh-3b-radar-label' + stateClass },
+          h(
+            'text',
+            { x: anchor.x.toFixed(2), y: (anchor.y - 4).toFixed(2), textAnchor, className: 'dsh-3b-radar-label-name' },
+            axis.label,
+          ),
+          h(
+            'text',
+            { x: anchor.x.toFixed(2), y: (anchor.y + 8).toFixed(2), textAnchor, className: 'dsh-3b-radar-label-score' },
+            axis.score === null ? '暂无数据' : String(axis.score) + ' · ' + axis.tier,
+          ),
+        ))
+        if (axis.score !== null) {
+          const vertex = radarPoint(index, Math.max(0, Math.min(100, axis.score)) / 100)
+          vertexNodes.push(h('circle', {
+            key: 'dot-' + axis.domain,
+            cx: vertex.x.toFixed(2),
+            cy: vertex.y.toFixed(2),
+            r: 2.6,
+            className: 'dsh-3b-radar-dot dsh-3b-tier-fill-' + axis.tierIndex,
+            opacity: axis.state === 'carried' ? 0.6 : 1,
+          }))
+        }
+        if (axis.state === 'missing') {
+          vertexNodes.push(h('line', {
+            key: 'axis-missing-' + axis.domain,
+            x1: RADAR_CENTER.x,
+            y1: RADAR_CENTER.y,
+            x2: outer.x.toFixed(2),
+            y2: outer.y.toFixed(2),
+            className: 'dsh-3b-radar-axis-missing',
+          }))
+        }
+      }
+      const shortfalls = axes.filter((axis) => axis.shortfall)
+      return h(
+        'section',
+        { className: 'dsh-3b-card dsh-3b-radar-card', 'aria-label': '六维健康雷达图' },
+        h(
+          'div',
+          { className: 'dsh-3b-radar-head' },
+          h('h3', null, '六维健康雷达'),
+          h(
+            'select',
+            {
+              className: 'dsh-3b-select dsh-3b-radar-compare-select',
+              value: String(compareDays || 15),
+              'aria-label': '雷达对比期',
+              disabled: Boolean(compareBusy),
+              onChange: (event) => onChangeCompareDays(Number(event.target.value)),
+            },
+            h('option', { value: '15' }, '对比 15 天'),
+            h('option', { value: '30' }, '对比 30 天'),
+          ),
+          h(FocusBang, {
+            title: '六维健康雷达',
+            rows: [
+              { label: '轴的含义', text: axes.map((axis) => axis.label + '（' + axis.members.join('、') + '）').join('；') },
+              { label: '计算口径', text: '每条轴 = 域内各项健康分的加权平均，取 0–100；数值越高越健康。单项分数由连续曲线给出：人群百分位 50th=70 分、90th=90 分、97th 起封顶 100。' },
+              { label: '五档分界', text: '优秀 ≥80、良好 ≥60、一般 ≥40、待改善 ≥20、需改善 <20；5 圈刻度正好落在 20/40/60/80/100。' },
+              { label: '对比轮廓', text: '虚线为对比期轮廓，取自每日归档的六轴分数；历史不足时不绘制。' },
+              { label: '数据时效', text: '近 7 日无记录但 30 日窗口内有实测的轴按半透明绘制并标注沿用日期；整窗无记录的轴置灰且不计入平均。' },
+              { label: '数据截至', text: (model.windowEnd || '—') + (model.truncated ? '（当日未完结，日均类取最近 7 个完结日）' : '') },
+            ],
+          }),
+        ),
+        h(
+          'svg',
+          {
+            className: 'dsh-3b-radar-svg',
+            viewBox: '0 0 ' + RADAR_WIDTH + ' ' + RADAR_HEIGHT,
+            role: 'img',
+            'aria-label': axes.map((axis) => axis.label + (axis.score === null ? ' 暂无数据' : ' ' + axis.score + ' 分 ' + axis.tier)).join('；'),
+          },
+          RADAR_RINGS.map((ring, ringIndex) => h('polygon', {
+            key: 'ring-' + ring,
+            points: radarPolygon(ring / 100),
+            className: ringIndex === RADAR_RINGS.length - 1 ? 'dsh-3b-radar-ring outer' : 'dsh-3b-radar-ring',
+          })),
+          axes.map((axis, index) => {
+            const outer = radarPoint(index, 1)
+            return h('line', {
+              key: 'axis-' + axis.domain,
+              x1: RADAR_CENTER.x,
+              y1: RADAR_CENTER.y,
+              x2: outer.x.toFixed(2),
+              y2: outer.y.toFixed(2),
+              className: 'dsh-3b-radar-axis',
+            })
+          }),
+          comparePoints && h('polygon', {
+            points: comparePoints,
+            className: 'dsh-3b-radar-compare',
+          }),
+          polygonPoints && h('polygon', {
+            points: polygonPoints,
+            className: 'dsh-3b-radar-area dsh-3b-tier-fill-' + (overallTier === null ? 2 : overallTier),
+            opacity: axes.some((axis) => axis.state === 'carried') ? 0.7 : 1,
+          }),
+          vertexNodes,
+          labelNodes,
+        ),
+        shortfalls.length > 0 && h(
+          'ul',
+          { className: 'dsh-3b-radar-gaps' },
+          shortfalls.map((axis) => h(
+            'li',
+            { key: 'gap-' + axis.domain },
+            h('span', { className: 'dsh-3b-radar-gap-domain' }, axis.label),
+            h('span', { className: 'dsh-3b-radar-gap-text' }, axis.shortfall.label + ' ' + axis.shortfall.valueText + (axis.shortfall.unit === '%' ? '%' : ' ' + axis.shortfall.unit) + ' ' + axis.shortfall.status),
+          )),
+        ),
+        radar.compare && radar.compare.length > 0 && h(
+          'p',
+          { className: 'dsh-3b-radar-compare-note' },
+          h('span', { className: 'dsh-3b-radar-legend-today' }, '今日'),
+          h('span', { className: 'dsh-3b-radar-legend-past' }, '对比 ' + radar.compareDays + ' 天前（' + radar.compareDate + '）'),
+          h('span', { className: 'dsh-3b-radar-legend-delta' }, '综合 ' + (radar.compareComposite === null ? '—' : radar.compareComposite) + ' → ' + (model.score === null ? '—' : model.score)),
+        ),
+        radar.compareMissing && h('p', { className: 'dsh-3b-radar-note' }, '历史不足，暂无对比轮廓（需累积 ' + radar.compareDays + ' 天记录）'),
+        radar.staleNote && h('p', { className: 'dsh-3b-radar-note' }, radar.staleNote),
+        radar.carriedNote && h('p', { className: 'dsh-3b-radar-note' }, radar.carriedNote),
       )
     }
 
@@ -4946,7 +5695,7 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function FocusSidebar({ model, onSaveProfile, savingProfile, profileError, push, onTogglePush, pushBusy, onChangeRule, ruleBusy }) {
+    function FocusSidebar({ model, onSaveProfile, savingProfile, profileError, push, onTogglePush, pushBusy, onChangeRule, ruleBusy, compareDays, onChangeCompareDays, compareBusy }) {
       const pushState = push || { enabled: false, hour: 10, minute: 0 }
       if (!model || !model.available) {
         return h(
@@ -4984,6 +5733,7 @@ window.__ModuleLoader__.load({
           error: profileError,
         }),
         h(HealthScoreHero, { model }),
+        h(HealthRadarCard, { model, compareDays, onChangeCompareDays, compareBusy }),
         h(
           'section',
           { className: 'dsh-3b-focus-section' },
@@ -5027,6 +5777,7 @@ window.__ModuleLoader__.load({
       const [savingProfile, setSavingProfile] = useState(false)
       const [profileError, setProfileError] = useState('')
       const [pushBusy, setPushBusy] = useState(false)
+      const [compareBusy, setCompareBusy] = useState(false)
       const [ruleBusy, setRuleBusy] = useState(false)
 
       useEffect(() => {
@@ -5099,6 +5850,7 @@ window.__ModuleLoader__.load({
         periods: [30, 30, 30, 30, 30, 30],
         stage_days: 30,
         profile: DEFAULT_PROFILE,
+        radar_compare_days: 15,
       }
       const checkins = dash?.checkins
       const pushState = dash?.push || { enabled: false, hour: 10, minute: 0 }
@@ -5174,6 +5926,25 @@ window.__ModuleLoader__.load({
         }
       }
 
+      const saveCompareDays = async (nextDays) => {
+        setCompareBusy(true)
+        setErr('')
+        try {
+          const saved = await apiFetch('/api/3b-health/preferences', {
+            method: 'POST',
+            body: JSON.stringify({ radar_compare_days: nextDays }),
+          })
+          setDash(prev => (prev ? { ...prev, preferences: saved } : prev))
+          if (dashboardCache) {
+            dashboardCache = { data: { ...dashboardCache.data, preferences: saved }, at: Date.now() }
+          }
+        } catch (e) {
+          setErr(e.message || '切换对比期失败')
+        } finally {
+          setCompareBusy(false)
+        }
+      }
+
       const togglePush = async () => {
         const next = !pushState.enabled
         setPushBusy(true)
@@ -5218,9 +5989,35 @@ window.__ModuleLoader__.load({
 
       const metricsList = health?.trend?.metrics || []
       const focusModel = useMemo(
-        () => evaluateHealthFocus(health, checkins, prefs.profile || DEFAULT_PROFILE, prefs.focus_rule),
-        [health, checkins, prefs.profile, prefs.focus_rule],
+        () => evaluateHealthFocus(
+          health,
+          checkins,
+          prefs.profile || DEFAULT_PROFILE,
+          prefs.focus_rule,
+          dash && dash.radar_history,
+          prefs.radar_compare_days,
+        ),
+        [health, checkins, prefs.profile, prefs.focus_rule, dash && dash.radar_history, prefs.radar_compare_days],
       )
+
+      /* 每日把当日六轴分数归档一次，供 15/30 天对比使用；同日重复打开只覆盖不追加。 */
+      useEffect(() => {
+        const radar = focusModel && focusModel.radar
+        if (!radar || !radar.axes || radar.usableCount === 0) return
+        const date = focusModel.windowEnd
+        if (!date) return
+        const axes = radar.axes.map((axis) => axis.score)
+        if (axes.every((value) => value === null)) return
+        let cancelled = false
+        apiFetch('/api/3b-health/radar/history', {
+          method: 'POST',
+          body: JSON.stringify({ date, version: SCORING_VERSION, composite: focusModel.score, axes }),
+        }).then((res) => {
+          if (cancelled || !res || !Array.isArray(res.history)) return
+          setDash((prev) => (prev ? { ...prev, radar_history: res.history } : prev))
+        }).catch(() => {})
+        return () => { cancelled = true }
+      }, [focusModel])
       const stageDays = prefs.stage_days || 30
       const stageRows = useMemo(() => {
         const seen = new Set()
@@ -5759,6 +6556,9 @@ window.__ModuleLoader__.load({
                       pushBusy,
                       onChangeRule: saveFocusRule,
                       ruleBusy,
+                      compareDays: prefs.radar_compare_days || 15,
+                      onChangeCompareDays: saveCompareDays,
+                      compareBusy,
                     }),
                   ),
                 ),

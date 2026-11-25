@@ -281,6 +281,100 @@ const targetId = option('target') || process.env.DSH_IM_TARGET_ID || (delivery &
 const modeOption = option('mode') || process.env.DSH_DELIVERY_MODE || (delivery && delivery.mode) || 'document'
 const mode = modeOption === 'photo' ? 'photo' : 'document'
 const caption = option('caption') || ('3B健康 · ' + today + ' · 综合评分 ' + (model.score === null ? '—' : model.score) + ' 分')
+const TIER_COLORS = ['#2e6b4f', '#4f7d5c', '#9b7a2e', '#b0662e', '#a33a2f']
+const TIER_LABELS = ['优秀', '良好', '一般', '待改善', '需改善']
+const RADAR_CENTER = { x: 170, y: 142 }
+const RADAR_RADIUS = 78
+const RADAR_RINGS = [20, 40, 60, 80, 100]
+const RADAR_AXES = 6
+
+function radarPoint(index, ratio) {
+  const angle = (-90 + index * (360 / RADAR_AXES)) * (Math.PI / 180)
+  return {
+    x: RADAR_CENTER.x + Math.cos(angle) * RADAR_RADIUS * ratio,
+    y: RADAR_CENTER.y + Math.sin(angle) * RADAR_RADIUS * ratio,
+  }
+}
+
+function radarRing(ratio) {
+  return Array.from({ length: RADAR_AXES }, (_, i) => i)
+    .map((index) => {
+      const point = radarPoint(index, ratio)
+      return num(point.x) + ',' + num(point.y)
+    })
+    .join(' ')
+}
+
+/**
+ * 把雷达模型渲染成内联 SVG，与页面同一套几何与配色。
+ * @param {object | null} radar evaluateHealthFocus 返回的 radar
+ * @param {number | null} overallTier 综合分档位序号，决定多边形配色
+ * @returns {string} SVG 字符串；无可用维度时返回空状态段落
+ */
+function radarSvg(radar, overallTier) {
+  if (!radar || !Array.isArray(radar.axes) || !radar.axes.length) return ''
+  const axes = radar.axes
+  const usable = axes.map((axis, index) => (axis.score === null ? -1 : index)).filter((index) => index >= 0)
+  const parts = []
+  parts.push('<svg viewBox="0 0 340 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="六维健康雷达图">')
+  for (const ring of RADAR_RINGS) {
+    parts.push('<polygon points="' + radarRing(ring / 100) + '" fill="none" stroke="'
+      + (ring === 100 ? 'rgba(10,10,11,0.55)' : 'rgba(10,10,11,0.16)') + '" stroke-width="1"/>')
+  }
+  axes.forEach((axis, index) => {
+    const outer = radarPoint(index, 1)
+    parts.push('<line x1="' + RADAR_CENTER.x + '" y1="' + RADAR_CENTER.y + '" x2="' + num(outer.x) + '" y2="' + num(outer.y)
+      + '" stroke="' + (axis.state === 'missing' ? 'rgba(10,10,11,0.35)' : 'rgba(10,10,11,0.16)') + '" stroke-width="1"'
+      + (axis.state === 'missing' ? ' stroke-dasharray="3 3"' : '') + '/>')
+  })
+  if (usable.length >= 3) {
+    const tier = overallTier === null || overallTier === undefined ? 2 : overallTier
+    const points = usable.map((index) => {
+      const point = radarPoint(index, Math.max(0, Math.min(100, axes[index].score)) / 100)
+      return num(point.x) + ',' + num(point.y)
+    }).join(' ')
+    parts.push('<polygon points="' + points + '" fill="' + TIER_COLORS[tier] + '" fill-opacity="0.12" stroke="'
+      + TIER_COLORS[tier] + '" stroke-width="1.5"/>')
+  }
+  axes.forEach((axis, index) => {
+    if (axis.score === null) return
+    const vertex = radarPoint(index, Math.max(0, Math.min(100, axis.score)) / 100)
+    const tier = axis.tierIndex === null || axis.tierIndex === undefined ? 2 : axis.tierIndex
+    parts.push('<circle cx="' + num(vertex.x) + '" cy="' + num(vertex.y) + '" r="2.6" fill="' + TIER_COLORS[tier] + '"'
+      + (axis.state === 'carried' ? ' fill-opacity="0.6"' : '') + '/>')
+  })
+  axes.forEach((axis, index) => {
+    const anchor = radarPoint(index, 1.2)
+    const dx = anchor.x - RADAR_CENTER.x
+    const textAnchor = Math.abs(dx) < 6 ? 'middle' : dx > 0 ? 'start' : 'end'
+    const dim = axis.state === 'missing' ? ' fill-opacity="0.65"' : axis.state === 'carried' ? ' fill-opacity="0.7"' : ''
+    parts.push('<text x="' + num(anchor.x) + '" y="' + num(anchor.y - 4) + '" text-anchor="' + textAnchor
+      + '" fill="#6b675f" font-size="10.5"' + dim + '>' + esc(axis.label) + '</text>')
+    const scoreText = axis.score === null ? '暂无数据' : axis.score + ' · ' + axis.tier
+    parts.push('<text x="' + num(anchor.x) + '" y="' + num(anchor.y + 8) + '" text-anchor="' + textAnchor
+      + '" fill="#8a857c" font-size="9.5" font-family="ui-monospace, monospace"' + dim + '>' + esc(scoreText) + '</text>')
+  })
+  parts.push('</svg>')
+  return parts.join('')
+}
+
+/**
+ * 把雷达的短板与状态说明渲染成模板内的一行文字。
+ * @param {object | null} radar evaluateHealthFocus 返回的 radar
+ * @returns {string} 已转义的说明文字，无内容时为空串
+ */
+function radarNotes(radar) {
+  if (!radar) return ''
+  const pieces = []
+  const gaps = (radar.axes || []).filter((axis) => axis.shortfall)
+  for (const axis of gaps) {
+    pieces.push(axis.label + ' ↓ ' + axis.shortfall.label + ' ' + axis.shortfall.valueText)
+  }
+  if (radar.staleNote) pieces.push(radar.staleNote)
+  if (radar.carriedNote) pieces.push(radar.carriedNote)
+  return pieces.length ? esc(pieces.join(' · ')) : ''
+}
+
 const templateName = mode === 'photo' ? 'report-template-photo.html' : 'report-template.html'
 const template = readFileSync(join(pluginRoot, 'scripts', templateName), 'utf8')
 const isTelegram = channel === 'telegram' || String(botId).indexOf('telegram_') === 0
@@ -320,6 +414,8 @@ html = fill(html, '{{PROFILE}}', esc('生理基准：' + (profile.sex === 'male'
 html = fill(html, '{{SCORE}}', esc(model.score === null ? '—' : model.score))
 html = fill(html, '{{ADVICE}}', esc(model.advice))
 html = fill(html, '{{CARDS}}', model.cards.map(cardHtml).join(''))
+html = fill(html, '{{RADAR}}', radarSvg(model.radar, model.scoreTierIndex))
+html = fill(html, '{{RADAR_NOTES}}', radarNotes(model.radar))
 html = fill(html, '{{GRID}}', gridSvg(model.grid))
 html = fill(html, '{{ZONE}}', esc(model.grid && model.grid.current ? '当前：' + model.grid.zoneLabel : ''))
 const currentZone = model.grid && model.grid.current ? model.grid.current : null
