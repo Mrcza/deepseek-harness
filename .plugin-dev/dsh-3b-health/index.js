@@ -586,6 +586,7 @@ function getPreferences(store = resolveStore()) {
           periods: data.periods.map(p => ([30, 90, 365].includes(Number(p)) ? Number(p) : 30)),
           stage_days: [30, 90, 365].includes(Number(data.stage_days)) ? Number(data.stage_days) : 30,
           focus_rule: FOCUS_RULE_IDS.includes(data.focus_rule) ? data.focus_rule : DEFAULT_FOCUS_RULE,
+          radar_compare_days: [15, 30].includes(Number(data.radar_compare_days)) ? Number(data.radar_compare_days) : 15,
           profile: cleanProfile(data.profile, DEFAULT_PROFILE),
           updated_at: data.updated_at || null,
           source_label: data.source_label || PLUGIN_LABEL,
@@ -598,6 +599,7 @@ function getPreferences(store = resolveStore()) {
     periods: [...DEFAULT_PERIODS],
     stage_days: 30,
     focus_rule: DEFAULT_FOCUS_RULE,
+    radar_compare_days: 15,
     profile: { ...DEFAULT_PROFILE },
     updated_at: null,
     source_label: PLUGIN_LABEL,
@@ -620,6 +622,9 @@ function savePreferences(payload) {
   const cleanPeriods = periods.map(p => ([30, 90, 365].includes(Number(p)) ? Number(p) : 30))
   const cleanStage = [30, 90, 365].includes(Number(stageDays)) ? Number(stageDays) : 30
   const focusRule = FOCUS_RULE_IDS.includes(payload.focus_rule) ? payload.focus_rule : current.focus_rule
+  const compareDays = [15, 30].includes(Number(payload.radar_compare_days))
+    ? Number(payload.radar_compare_days)
+    : current.radar_compare_days
   const submittedProfile = payload.profile && typeof payload.profile === 'object' && !Array.isArray(payload.profile)
   const cleanProfileDoc = submittedProfile ? cleanProfile(payload.profile, current.profile) : current.profile
   const profileNote = submittedProfile
@@ -632,6 +637,7 @@ function savePreferences(payload) {
     periods: cleanPeriods,
     stage_days: cleanStage,
     focus_rule: focusRule,
+    radar_compare_days: compareDays,
     profile: cleanProfileDoc,
     updated_at: nowShanghaiIso(),
     plugin_id: PLUGIN_ID,
@@ -1269,6 +1275,50 @@ function setPushEnabled(enabled) {
   return { ...state, plist: target.plistPath, script: PUSH_SCRIPT_PATH, loaded: isPushLoaded() }
 }
 
+
+/** 雷达历史归档文件名（每日一行 JSONL，含评分口径版本）。 */
+const RADAR_HISTORY_FILENAME = 'dsh-health-radar-history.jsonl'
+/** 归档保留天数：足够覆盖 30 天对比期并留余量。 */
+const RADAR_HISTORY_KEEP_DAYS = 400
+
+/**
+ * 读取雷达历史归档。
+ * @param {string | null} runtimeDir 运行时目录
+ * @returns {Array<{date: string, version: string, composite: number | null, axes: Array<number | null>}>} 按日期升序的历史记录
+ */
+function readRadarHistory(runtimeDir) {
+  if (!runtimeDir) return []
+  const file = join(runtimeDir, RADAR_HISTORY_FILENAME)
+  if (!existsSync(file)) return []
+  try {
+    return readFileSync(file, 'utf8')
+      .split('\n')
+      .filter((line) => line.trim())
+      .map((line) => {
+        try { return JSON.parse(line) } catch (_e) { return null }
+      })
+      .filter((row) => row && typeof row.date === 'string')
+  } catch (_e) {
+    return []
+  }
+}
+
+/**
+ * 写入当日雷达归档；同一天只保留最新一条，并按保留天数裁剪。
+ * @param {string | null} runtimeDir 运行时目录
+ * @param {string} date 资料日期 YYYY-MM-DD
+ * @param {{version: string, composite: number | null, axes: Array<number | null>}} snapshot 当日评分
+ */
+function appendRadarHistory(runtimeDir, date, snapshot) {
+  if (!runtimeDir || !date) return
+  const existing = readRadarHistory(runtimeDir).filter((row) => row.date !== date)
+  existing.push({ date, version: snapshot.version, composite: snapshot.composite, axes: snapshot.axes })
+  existing.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+  const cutoff = existing.length > RADAR_HISTORY_KEEP_DAYS ? existing.length - RADAR_HISTORY_KEEP_DAYS : 0
+  const kept = existing.slice(cutoff)
+  mkdirSync(runtimeDir, { recursive: true, mode: 0o700 })
+  atomicWrite(join(runtimeDir, RADAR_HISTORY_FILENAME), kept.map((row) => JSON.stringify(row)).join('\n') + '\n')
+}
 function getDashboard() {
   const store = resolveStore()
   const paths = resolvePaths(store)
@@ -1288,6 +1338,7 @@ function getDashboard() {
     push: readPushState(paths),
     checkins: listCheckins(30, store),
     sync_folder: folderSync,
+    radar_history: readRadarHistory(paths.runtimeDir),
     source_label: PLUGIN_LABEL,
   }
 }
@@ -1715,6 +1766,21 @@ async function handleFetchRequest(request) {
       return Response.json(deleteCheckin(body), { headers: { 'Cache-Control': 'no-store' } })
     }
 
+    if (method === 'POST' && subPath === 'radar/history') {
+      const body = await request.json()
+      const store = resolveStore()
+      const paths = resolvePaths(store)
+      const date = typeof body.date === 'string' ? body.date.slice(0, 10) : ''
+      const axes = Array.isArray(body.axes) ? body.axes.map((item) => (typeof item === 'number' && Number.isFinite(item) ? Math.round(item) : null)) : []
+      const composite = typeof body.composite === 'number' && Number.isFinite(body.composite) ? Math.round(body.composite) : null
+      const version = typeof body.version === 'string' ? body.version : 'v2'
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || axes.length === 0) {
+        return Response.json({ error: '雷达归档需要 date 与 axes' }, { status: 400, headers: { 'Cache-Control': 'no-store' } })
+      }
+      appendRadarHistory(paths.runtimeDir, date, { version, composite, axes })
+      return Response.json({ ok: true, history: readRadarHistory(paths.runtimeDir) }, { headers: { 'Cache-Control': 'no-store' } })
+    }
+
     if (method === 'GET' && subPath === 'sync') {
       return Response.json(readSyncStatus(), { headers: { 'Cache-Control': 'no-store' } })
     }
@@ -1759,6 +1825,7 @@ const ROUTES = [
   { path: '/api/3b-health', methods: ['GET', 'POST'] },
   { path: '/api/3b-health/dashboard', methods: ['GET', 'POST'] },
   { path: '/api/3b-health/preferences', methods: ['POST'] },
+  { path: '/api/3b-health/radar/history', methods: ['POST'] },
   { path: '/api/3b-health/push', methods: ['POST'] },
   { path: '/api/3b-health/checkins', methods: ['GET', 'POST'] },
   { path: '/api/3b-health/checkins/delete', methods: ['POST'] },

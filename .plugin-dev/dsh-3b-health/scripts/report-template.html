@@ -72,6 +72,10 @@
   .fc-gap .action { color: #6b675f; }
   .grid-wrap { padding: 10px 12px 4px; border: 1px solid rgba(10, 10, 11, 0.16); background: #f7f5f1; }
   .grid-wrap svg { display: block; width: 100%; height: auto; }
+  .radar-wrap { padding: 10px 12px 4px; border: 1px solid rgba(10, 10, 11, 0.16); background: #f7f5f1; }
+  .radar-wrap svg { display: block; width: 100%; max-width: 420px; height: auto; margin: 0 auto; }
+  .radar-notes { margin: 6px 0 0; font-size: 10px; line-height: 15px; color: #8a857c; }
+  .radar-notes:empty { display: none; }
   .empty { margin: 12px; font-size: 12px; color: #8a857c; }
   .targets { list-style: none; margin: 0; padding: 0; border-top: 1px solid rgba(10, 10, 11, 0.16); }
   .targets li {
@@ -110,6 +114,11 @@
       <p>{{ADVICE}}</p>
     </div>
   </div>
+  <section>
+    <div class="section-head"><h3 class="serif">五维健康雷达</h3><span>0–100 · 越高越健康</span></div>
+    <div class="radar-wrap">{{RADAR}}</div>
+    <p class="radar-notes mono">{{RADAR_NOTES}}</p>
+  </section>
   <section>
     <div class="section-head"><h3 class="serif">重点关注</h3><span>五域保底 + 全局补位 · 按关注度排序</span></div>
     <div class="cards">{{CARDS}}</div>
